@@ -478,11 +478,89 @@ export default function ReportDetailPage({
 
     console.log(`Detail page: Final result before sorting: ${result.length} valid units processed`)
 
-    // Sort the final result
-    const sortedResult = sortDataByUnit(result)
-    console.log(`Detail page: Final result after sorting: ${sortedResult.length} valid units`)
+    // Group installations by unit and count quantities
+    const consolidatedData: Record<
+      string,
+      {
+        unit: string
+        kitchenCount: number
+        bathroomCount: number
+        showerCount: number
+        toiletCount: number
+        notes: string[]
+        originalItem: InstallationData
+      }
+    > = {}
 
-    return sortedResult
+    // Process each row and consolidate by unit
+    for (const item of result) {
+      const unitValue = unitColumn ? item[unitColumn] : item.Unit
+      const unitKey = String(unitValue || "").trim()
+
+      if (!unitKey) continue
+
+      // Initialize unit data if not exists
+      if (!consolidatedData[unitKey]) {
+        consolidatedData[unitKey] = {
+          unit: unitKey,
+          kitchenCount: 0,
+          bathroomCount: 0,
+          showerCount: 0,
+          toiletCount: 0,
+          notes: [],
+          originalItem: item,
+        }
+      }
+
+      // Count installations for this unit
+      if (
+        kitchenAeratorColumn &&
+        item[kitchenAeratorColumn] &&
+        item[kitchenAeratorColumn] !== "" &&
+        item[kitchenAeratorColumn] !== "0"
+      ) {
+        consolidatedData[unitKey].kitchenCount++
+      }
+      if (
+        bathroomAeratorColumn &&
+        item[bathroomAeratorColumn] &&
+        item[bathroomAeratorColumn] !== "" &&
+        item[bathroomAeratorColumn] !== "0"
+      ) {
+        consolidatedData[unitKey].bathroomCount++
+      }
+      if (getShowerValue(item) !== "No Touch.") {
+        consolidatedData[unitKey].showerCount++
+      }
+      if (hasToiletInstalled(item)) {
+        consolidatedData[unitKey].toiletCount++
+      }
+
+      // Collect notes
+      const compiledNotes = compileNotesForUnit(item, true)
+      if (compiledNotes && compiledNotes.trim()) {
+        consolidatedData[unitKey].notes.push(compiledNotes.trim())
+      }
+    }
+
+    // Convert back to array format with consolidated data
+    const consolidatedResult = Object.values(consolidatedData).map((unitData) => {
+      // Create a new item with consolidated information
+      const consolidatedItem = { ...unitData.originalItem }
+
+      // Store counts in the item for later use
+      consolidatedItem._kitchenCount = unitData.kitchenCount
+      consolidatedItem._bathroomCount = unitData.bathroomCount
+      consolidatedItem._showerCount = unitData.showerCount
+      consolidatedItem._toiletCount = unitData.toiletCount
+      consolidatedItem._consolidatedNotes = [...new Set(unitData.notes)].join(" ")
+
+      return consolidatedItem
+    })
+
+    console.log(`Detail page: After consolidation: ${consolidatedResult.length} unique units`)
+
+    return sortDataByUnit(consolidatedResult)
   })()
 
   console.log("Filtered data length:", filteredData.length)
@@ -646,7 +724,7 @@ export default function ReportDetailPage({
             if (storedNotes[newUnit]) {
               console.log("Unit added to details has a note, ensuring it appears in notes section:", newUnit)
               // The notes section will automatically pick this up through the unified notes system
-              // Dispatch the event to notify the notes section
+              // Dispatch event to notify the notes section
               window.dispatchEvent(new Event("unifiedNotesUpdated"))
             }
           }
@@ -927,18 +1005,23 @@ export default function ReportDetailPage({
                 (row) => (unitColumn ? row[unitColumn] : row.Unit) === unitValue,
               )
 
-              // Get values for display
-              const kitchenAerator = kitchenAeratorColumn
-                ? getAeratorDescription(item[kitchenAeratorColumn] ?? "", "kitchen")
-                : ""
-              const bathroomAerator = bathroomAeratorColumn
-                ? getAeratorDescription(item[bathroomAeratorColumn] ?? "", "bathroom")
-                : ""
-              const shower = getShowerValue(item) // Use the new function
-              const toilet = hasToiletInstalled(item) ? "0.8 GPF" : ""
+              // Get values for display with consolidated counts
+              const kitchenCount = item._kitchenCount || 0
+              const bathroomCount = item._bathroomCount || 0
+              const showerCount = item._showerCount || 0
+              const toiletCount = item._toiletCount || 0
 
-              // Get compiled notes (including "not accessed" for details section)
-              const compiledNotes = compileNotesForUnit(item, true)
+              const kitchenAerator =
+                kitchenAeratorColumn && kitchenCount > 0 ? getAeratorDescription(String(kitchenCount), "kitchen") : ""
+              const bathroomAerator =
+                bathroomAeratorColumn && bathroomCount > 0
+                  ? getAeratorDescription(String(bathroomCount), "bathroom")
+                  : ""
+              const shower = showerCount > 0 ? getAeratorDescription(String(showerCount), "shower") : "No Touch."
+              const toilet = toiletCount > 0 ? (toiletCount > 1 ? `0.8 GPF (${toiletCount})` : "0.8 GPF") : ""
+
+              // Get compiled notes (use consolidated notes if available)
+              const compiledNotes = item._consolidatedNotes || compileNotesForUnit(item, true)
               const finalNote = getFinalNoteForUnit(unitValue ?? "", compiledNotes)
 
               return (
@@ -1116,16 +1199,23 @@ export default function ReportDetailPage({
               <tbody>
                 {pageData.map((item, index) => {
                   const unitValue = unitColumn ? item[unitColumn] : item.Unit
-                  const kitchenAerator = kitchenAeratorColumn
-                    ? getAeratorDescription(item[kitchenAeratorColumn] ?? "", "kitchen")
-                    : ""
-                  const bathroomAerator = bathroomAeratorColumn
-                    ? getAeratorDescription(item[bathroomAeratorColumn] ?? "", "bathroom")
-                    : ""
-                  const shower = getShowerValue(item) // Use the new function
-                  const toilet = hasToiletInstalled(item) ? "0.8 GPF" : ""
+                  const kitchenCount = item._kitchenCount || 0
+                  const bathroomCount = item._bathroomCount || 0
+                  const showerCount = item._showerCount || 0
+                  const toiletCount = item._toiletCount || 0
 
-                  const compiledNotes = compileNotesForUnit(item, true)
+                  const kitchenAerator =
+                    kitchenAeratorColumn && kitchenCount > 0
+                      ? getAeratorDescription(String(kitchenCount), "kitchen")
+                      : ""
+                  const bathroomAerator =
+                    bathroomAeratorColumn && bathroomCount > 0
+                      ? getAeratorDescription(String(bathroomCount), "bathroom")
+                      : ""
+                  const shower = showerCount > 0 ? getAeratorDescription(String(showerCount), "shower") : "No Touch."
+                  const toilet = toiletCount > 0 ? (toiletCount > 1 ? `0.8 GPF (${toiletCount})` : "0.8 GPF") : ""
+
+                  const compiledNotes = item._consolidatedNotes || compileNotesForUnit(item, true)
                   const finalNote = getFinalNoteForUnit(unitValue ?? "", compiledNotes)
 
                   return (
