@@ -2,7 +2,6 @@
 
 import { useReportContext } from "@/lib/report-context"
 import EditableText from "@/components/editable-text"
-import ImageUploader from "@/components/image-uploader"
 import type { CustomerInfo } from "@/lib/types"
 
 interface ReportCoverPageProps {
@@ -87,8 +86,6 @@ export default function ReportCoverPage({ customerInfo, isEditable = true }: Rep
 
         {/* Image upload section - positioned between address and ATTN */}
         <div className="mb-12 w-full flex flex-col items-center">
-          
-
           {coverImage && (
             <div className="w-full flex justify-center">
               <img

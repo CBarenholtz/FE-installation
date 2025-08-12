@@ -723,21 +723,22 @@ export default function EnhancedPdfButton({
 
       // Add the address
       doc.setFontSize(14)
-      doc.text(`${customerInfo.address} ${customerInfo.city}, ${customerInfo.state} ${customerInfo.zip}`, 105, 60, { align: "center" })
+      doc.text(`${customerInfo.address} ${customerInfo.city}, ${customerInfo.state} ${customerInfo.zip}`, 105, 60, {
+        align: "center",
+      })
       //doc.text(`${customerInfo.city}, ${customerInfo.state} ${customerInfo.zip}`, 105, 110, { align: "center" })
 
-      doc.setTextColor(0,0,0)
-
+      doc.setTextColor(0, 0, 0)
 
       // Add cover image if available
       let imageBottomY = 65 // Default to just below the line if no image
-      
+
       if (coverImage) {
         try {
           // Create a temporary image to get dimensions
           const tempImg = new Image()
           tempImg.src = coverImage
-          
+
           // Wait for image to load to get dimensions
           await new Promise((resolve, reject) => {
             tempImg.onload = resolve
@@ -749,37 +750,36 @@ export default function EnhancedPdfButton({
           const topBoundary = 70 // Just below the address line
           const bottomBoundary = 200 // Leave space for ATTN section
           const availableHeight = bottomBoundary - topBoundary // 130mm of vertical space
-          
+
           // Calculate maximum dimensions
           const maxWidth = pageWidth * 0.85 // 85% of page width
           const maxHeight = availableHeight
-          
+
           // Calculate the aspect ratio
           const aspectRatio = tempImg.width / tempImg.height
-          
+
           // Calculate dimensions to fit within constraints while maintaining aspect ratio
           let imgWidth = maxWidth
           let imgHeight = imgWidth / aspectRatio
-          
+
           // If height exceeds available space, scale down based on height instead
           if (imgHeight > maxHeight) {
             imgHeight = maxHeight
             imgWidth = imgHeight * aspectRatio
           }
-          
+
           // Center the image horizontally
           const imgX = (pageWidth - imgWidth) / 2
-          
+
           // Center the image vertically within the available space
           const verticalPadding = (availableHeight - imgHeight) / 2
           const imgY = topBoundary + verticalPadding
-          
+
           // Add the image
           doc.addImage(coverImage, "JPEG", imgX, imgY, imgWidth, imgHeight)
-          
+
           // Update where the image ends
           imageBottomY = imgY + imgHeight
-          
         } catch (error) {
           console.error("Error adding cover image to PDF:", error)
           // If there's an error, try adding the image without calculating dimensions
@@ -799,13 +799,17 @@ export default function EnhancedPdfButton({
       // Position ATTN section with proper spacing below the image
       doc.setFontSize(14)
       const attnY = Math.max(imageBottomY + 20, 210) // At least 20mm below image, but not lower than 210
-      
+
       doc.text("ATTN:", 105, attnY, { align: "center" })
       doc.setFontSize(13)
       doc.text(customerInfo.customerName, 105, attnY + 5, { align: "center" })
       doc.text(customerInfo.propertyName, 105, attnY + 10, { align: "center" })
-      doc.text(`${customerInfo.address} ${customerInfo.city}, ${customerInfo.state} ${customerInfo.zip}`, 105, attnY + 15 , { align: "center" })
-
+      doc.text(
+        `${customerInfo.address} ${customerInfo.city}, ${customerInfo.state} ${customerInfo.zip}`,
+        105,
+        attnY + 15,
+        { align: "center" },
+      )
 
       // Letter Page
       doc.addPage()
@@ -1066,43 +1070,43 @@ export default function EnhancedPdfButton({
         // Wrap and position unit header
         const unitHeaderLines = doc.splitTextToSize(latestColumnHeaders.unit, columnWidths[colIndex] - 2)
         unitHeaderLines.forEach((line: string, lineIndex: number) => {
-          doc.text(line, columnPositions[colIndex], yPos + (lineIndex * 3))
+          doc.text(line, columnPositions[colIndex], yPos + lineIndex * 3)
         })
         colIndex++
 
         // Wrap and position kitchen header
         if (hasKitchenAerators) {
-          const kitchenHeaderLines = latestColumnHeaders.kitchen.split('\n')
+          const kitchenHeaderLines = latestColumnHeaders.kitchen.split("\n")
           kitchenHeaderLines.forEach((line: string, lineIndex: number) => {
-            doc.text(line, columnPositions[colIndex], yPos + (lineIndex * 3))
+            doc.text(line, columnPositions[colIndex], yPos + lineIndex * 3)
           })
           colIndex++
         }
         if (hasBathroomAerators) {
-          const bathroomHeaderLines = latestColumnHeaders.bathroom.split('\n')
+          const bathroomHeaderLines = latestColumnHeaders.bathroom.split("\n")
           bathroomHeaderLines.forEach((line: string, lineIndex: number) => {
-            doc.text(line, columnPositions[colIndex], yPos + (lineIndex * 3))
+            doc.text(line, columnPositions[colIndex], yPos + lineIndex * 3)
           })
           colIndex++
         }
         if (hasShowers) {
-          const showerHeaderLines = latestColumnHeaders.shower.split('\n')
+          const showerHeaderLines = latestColumnHeaders.shower.split("\n")
           showerHeaderLines.forEach((line: string, lineIndex: number) => {
-            doc.text(line, columnPositions[colIndex], yPos + (lineIndex * 3))
+            doc.text(line, columnPositions[colIndex], yPos + lineIndex * 3)
           })
           colIndex++
         }
         if (hasToilets) {
-          const toiletHeaderLines = latestColumnHeaders.toilet.split('\n')
+          const toiletHeaderLines = latestColumnHeaders.toilet.split("\n")
           toiletHeaderLines.forEach((line: string, lineIndex: number) => {
-            doc.text(line, columnPositions[colIndex], yPos + (lineIndex * 3))
+            doc.text(line, columnPositions[colIndex], yPos + lineIndex * 3)
           })
           colIndex++
         }
         if (hasNotes) {
           const notesHeaderLines = doc.splitTextToSize(latestColumnHeaders.notes, columnWidths[colIndex] - 2)
           notesHeaderLines.forEach((line: string, lineIndex: number) => {
-            doc.text(line, columnPositions[colIndex], yPos + (lineIndex * 3))
+            doc.text(line, columnPositions[colIndex], yPos + lineIndex * 3)
           })
           colIndex++
         }
@@ -1124,7 +1128,7 @@ export default function EnhancedPdfButton({
           // Use the edited unit number if available, otherwise use the original
           const originalUnitValue = unitColumn ? item[unitColumn] : item.Unit
           const displayUnit =
-            (originalUnitValue && latestEditedUnits[originalUnitValue] !== undefined)
+            originalUnitValue && latestEditedUnits[originalUnitValue] !== undefined
               ? latestEditedUnits[originalUnitValue]
               : originalUnitValue || ""
 
@@ -1142,27 +1146,27 @@ export default function EnhancedPdfButton({
           const kitchenAerator =
             isSpecialUnit || !kitchenAeratorColumn
               ? ""
-              : (unitColumn && item[unitColumn] && latestEditedInstallations[item[unitColumn]]?.kitchen !== undefined)
+              : unitColumn && item[unitColumn] && latestEditedInstallations[item[unitColumn]]?.kitchen !== undefined
                 ? latestEditedInstallations[item[unitColumn]].kitchen
                 : getAeratorDescription(item[kitchenAeratorColumn] || "", "kitchen")
 
           // Replace the bathroomAerator calculation with:
           const bathroomAerator = !bathroomAeratorColumn
             ? ""
-            : (unitColumn && item[unitColumn] && latestEditedInstallations[item[unitColumn]]?.bathroom !== undefined)
+            : unitColumn && item[unitColumn] && latestEditedInstallations[item[unitColumn]]?.bathroom !== undefined
               ? latestEditedInstallations[item[unitColumn]].bathroom
               : getAeratorDescription(item[bathroomAeratorColumn] || "", "bathroom")
 
           // Replace the showerHead calculation with:
           const showerHead = !showerHeadColumn
             ? ""
-            : (unitColumn && item[unitColumn] && latestEditedInstallations[item[unitColumn]]?.shower !== undefined)
+            : unitColumn && item[unitColumn] && latestEditedInstallations[item[unitColumn]]?.shower !== undefined
               ? latestEditedInstallations[item[unitColumn]].shower
               : getAeratorDescription(item[showerHeadColumn] || "", "shower")
 
           // Replace the toilet calculation with:
           const toilet =
-            (unitColumn && item[unitColumn] && latestEditedInstallations[item[unitColumn]]?.toilet !== undefined)
+            unitColumn && item[unitColumn] && latestEditedInstallations[item[unitColumn]]?.toilet !== undefined
               ? latestEditedInstallations[item[unitColumn]].toilet
               : hasToiletInstalled(item)
                 ? "0.8 GPF"
@@ -1287,10 +1291,10 @@ export default function EnhancedPdfButton({
           doc.setFontSize(9)
 
           colIndex = 0
-          
+
           // Wrap unit text if it's too long
           unitLinesForHeight.forEach((line: string, lineIndex: number) => {
-            doc.text(line, columnPositions[colIndex], yPos + (lineIndex * 3))
+            doc.text(line, columnPositions[colIndex], yPos + lineIndex * 3)
           })
           colIndex++
 

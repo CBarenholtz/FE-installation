@@ -376,7 +376,7 @@ export default function ReportNotesPage({ notes, isPreview = true, isEditable = 
           // Add the unit to the details section as an additional row
           const additionalRows = JSON.parse(localStorage.getItem("additionalDetailRows") || "[]")
           const unitColumn = findUnitColumn(installationData)
-          
+
           // Check if this unit already exists in additional rows
           const existingRow = additionalRows.find((row: any) => {
             const rowUnit = unitColumn ? row[unitColumn] : row.Unit
@@ -406,7 +406,7 @@ export default function ReportNotesPage({ notes, isPreview = true, isEditable = 
             // Add to the beginning of additional rows
             const updatedAdditionalRows = [newRow, ...additionalRows]
             localStorage.setItem("additionalDetailRows", JSON.stringify(updatedAdditionalRows))
-            
+
             console.log("Added unit to details section:", value)
           }
         }
@@ -466,30 +466,30 @@ export default function ReportNotesPage({ notes, isPreview = true, isEditable = 
     if (isEditable) {
       const noteToDelete = editedNotes[index]
       const updatedNotes = editedNotes.filter((_, i) => i !== index)
-      
+
       // Remove from unified notes storage
       if (noteToDelete.unit) {
         const storedNotes = getStoredNotes()
         const updatedStoredNotes = { ...storedNotes }
         delete updatedStoredNotes[noteToDelete.unit]
         localStorage.setItem("unifiedNotes", JSON.stringify(updatedStoredNotes))
-        
+
         // Also remove the unit from the details section if it was added there
         const additionalRows = JSON.parse(localStorage.getItem("additionalDetailRows") || "[]")
         const unitColumn = findUnitColumn(installationData)
-        
+
         // Find and remove the row from additional rows
         const updatedAdditionalRows = additionalRows.filter((row: any) => {
           const rowUnit = unitColumn ? row[unitColumn] : row.Unit
           return rowUnit !== noteToDelete.unit
         })
-        
+
         if (updatedAdditionalRows.length !== additionalRows.length) {
           localStorage.setItem("additionalDetailRows", JSON.stringify(updatedAdditionalRows))
           console.log("Removed unit from details section:", noteToDelete.unit)
         }
       }
-      
+
       setEditedNotes(updatedNotes)
       setNotes(updatedNotes)
       localStorage.setItem("reportNotes", JSON.stringify(updatedNotes))
