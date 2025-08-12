@@ -54,6 +54,17 @@ export default function ExcelExportButton({
       const latestEditedInstallations = JSON.parse(localStorage.getItem("detailInstallations") || "{}")
       const latestColumnHeaders = JSON.parse(localStorage.getItem("columnHeaders") || "{}")
 
+      let picturesData: any[] = []
+      try {
+        const storedImages = localStorage.getItem("reportImages")
+        if (storedImages) {
+          picturesData = JSON.parse(storedImages)
+          console.log("Excel: Loaded pictures data:", picturesData.length, "images")
+        }
+      } catch (error) {
+        console.error("Excel: Error loading pictures data:", error)
+      }
+
       // Find column names (same logic as PDF)
       const findColumnName = (possibleNames: string[]): string | null => {
         if (!installationData || installationData.length === 0) return null
@@ -271,6 +282,32 @@ export default function ExcelExportButton({
 
         const notesSheet = XLSX.utils.aoa_to_sheet(notesData)
         XLSX.utils.book_append_sheet(workbook, notesSheet, "Notes")
+      }
+
+      if (picturesData.length > 0) {
+        const picturesSheetData = [["Unit", "Filename", "Caption", "Image URL"]]
+
+        // Sort pictures by unit
+        const sortedPictures = picturesData.sort((a, b) => {
+          const numA = Number.parseInt(a.unit)
+          const numB = Number.parseInt(b.unit)
+          if (!isNaN(numA) && !isNaN(numB)) {
+            return numA - numB
+          }
+          return a.unit.localeCompare(b.unit, undefined, { numeric: true, sensitivity: "base" })
+        })
+
+        sortedPictures.forEach((image) => {
+          picturesSheetData.push([
+            image.unit || "Unknown",
+            image.filename || "Unknown",
+            image.caption || "",
+            image.googleDriveId ? `https://drive.google.com/file/d/${image.googleDriveId}/view` : "Local file",
+          ])
+        })
+
+        const picturesSheet = XLSX.utils.aoa_to_sheet(picturesSheetData)
+        XLSX.utils.book_append_sheet(workbook, picturesSheet, "Pictures")
       }
 
       // Generate and download file

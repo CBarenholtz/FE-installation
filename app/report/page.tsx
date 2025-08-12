@@ -12,8 +12,10 @@ import ReportNotesPage from "@/components/report-notes-page"
 import ReportDetailPage from "@/components/report-detail-page"
 import EnhancedPdfButton from "@/components/enhanced-pdf-button"
 import ExcelExportButton from "@/components/excel-export-button"
+import ImageUpload from "@/components/image-upload"
+import ReportPicturesPage from "@/components/report-pictures-page"
 import { ReportProvider, useReportContext } from "@/lib/report-context"
-import type { CustomerInfo, InstallationData, Note } from "@/lib/types"
+import type { CustomerInfo, InstallationData, Note, ImageData } from "@/lib/types"
 
 // Loading component - separate component for loading state
 function LoadingState() {
@@ -56,6 +58,23 @@ function ReportView({
   onBack: () => void
 }) {
   const [currentPage, setCurrentPage] = useState("cover")
+  const [images, setImages] = useState<ImageData[]>([])
+
+  useEffect(() => {
+    const storedImages = localStorage.getItem("reportImages")
+    if (storedImages) {
+      try {
+        setImages(JSON.parse(storedImages))
+      } catch (error) {
+        console.error("Error loading images:", error)
+      }
+    }
+  }, [])
+
+  const handleImagesUploaded = (uploadedImages: ImageData[]) => {
+    setImages(uploadedImages)
+    localStorage.setItem("reportImages", JSON.stringify(uploadedImages))
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -82,11 +101,12 @@ function ReportView({
 
       <div className="print:hidden">
         <Tabs value={currentPage} onValueChange={setCurrentPage}>
-          <TabsList className="grid grid-cols-4">
+          <TabsList className="grid grid-cols-5">
             <TabsTrigger value="cover">Cover Page</TabsTrigger>
             <TabsTrigger value="letter">Letter Page</TabsTrigger>
             <TabsTrigger value="notes">Notes Pages</TabsTrigger>
             <TabsTrigger value="details">Detail Pages</TabsTrigger>
+            <TabsTrigger value="pictures">Pictures</TabsTrigger>
           </TabsList>
 
           <TabsContent value="cover">
@@ -104,6 +124,24 @@ function ReportView({
           <TabsContent value="details">
             <ReportDetailPage installationData={installationData} isPreview={true} isEditable={true} />
           </TabsContent>
+
+          <TabsContent value="pictures">
+            <div className="space-y-6">
+              <ImageUpload
+                onImagesUploaded={handleImagesUploaded}
+                existingImages={images}
+                installationData={installationData}
+                notes={notes}
+              />
+
+              {images.length > 0 && (
+                <div className="border-t pt-6">
+                  <h3 className="text-lg font-semibold mb-4">Pictures Report Preview</h3>
+                  <ReportPicturesPage isPreview={true} isEditable={true} />
+                </div>
+              )}
+            </div>
+          </TabsContent>
         </Tabs>
       </div>
 
@@ -120,6 +158,8 @@ function ReportView({
         <ReportNotesPage notes={notes} isPreview={false} isEditable={false} />
         <div className="page-break"></div>
         <ReportDetailPage installationData={installationData} isPreview={false} isEditable={false} />
+        <div className="page-break"></div>
+        <ReportPicturesPage isPreview={false} isEditable={false} />
       </div>
     </div>
   )

@@ -55,10 +55,10 @@ const defaultLetterText = [
   "Thank you for choosing Green Light Water Conservation. We look forward to working with you in the near future.",
 ]
 
-// Default section titles
 const defaultSectionTitles = {
   notes: "Notes",
   detailsTitle: "Detailed Unit Information",
+  pictures: "Installation Pictures",
 }
 
 const ReportContext = createContext<ReportContextType | undefined>(undefined)

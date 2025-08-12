@@ -375,6 +375,17 @@ export default function EnhancedPdfButton({
         sectionTitles,
       })
 
+      let picturesData: any[] = []
+      try {
+        const storedImages = localStorage.getItem("reportImages")
+        if (storedImages) {
+          picturesData = JSON.parse(storedImages)
+          console.log("PDF: Loaded pictures data:", picturesData.length, "images")
+        }
+      } catch (error) {
+        console.error("PDF: Error loading pictures data:", error)
+      }
+
       // Find the unit column first
       const unitColumn = findUnitColumn(installationData)
       console.log("PDF: Using unit column:", unitColumn)
@@ -712,6 +723,11 @@ export default function EnhancedPdfButton({
       const estimatedDetailPages = Math.ceil(filteredData.length / estimatedRowsPerPage)
       totalPages += estimatedDetailPages
 
+      const imagesPerPage = 4 // 2x2 grid
+      const picturesPages = picturesData.length > 0 ? Math.ceil(picturesData.length / imagesPerPage) : 0
+      totalPages += picturesPages
+      console.log("PDF: Adding", picturesPages, "pictures pages to total")
+
       // Cover Page
       addHeaderFooter(1, totalPages)
 
@@ -816,7 +832,7 @@ export default function EnhancedPdfButton({
       addHeaderFooter(2, totalPages)
 
       doc.setFontSize(12)
-      let yPos = contentStartY // Use the dynamic content start position instead of fixed 40
+      let yPos = contentStartY // Use the dynamic content start position instead
 
       doc.text(customerInfo.date, 15, yPos)
       yPos += 10
@@ -1360,6 +1376,114 @@ export default function EnhancedPdfButton({
           if (yPos + 10 > maxYPos) {
             break
           }
+        }
+      }
+
+      if (picturesData.length > 0) {
+        console.log("PDF: Adding pictures pages...")
+
+        // Group images by unit and sort
+        const imagesByUnit: { [unit: string]: any[] } = {}
+        picturesData.forEach((image) => {
+          if (!imagesByUnit[image.unit]) {
+            imagesByUnit[image.unit] = []
+          }
+          imagesByUnit[image.unit].push(image)
+        })
+
+        // Sort units
+        const sortedUnits = Object.keys(imagesByUnit).sort((a, b) => {
+          const numA = Number.parseInt(a)
+          const numB = Number.parseInt(b)
+          if (!isNaN(numA) && !isNaN(numB)) {
+            return numA - numB
+          }
+          return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
+        })
+
+        // Flatten images in sorted order
+        const sortedImages = sortedUnits.flatMap((unit) => imagesByUnit[unit])
+
+        // Split into pages
+        for (let i = 0; i < sortedImages.length; i += imagesPerPage) {
+          const pageImages = sortedImages.slice(i, i + imagesPerPage)
+
+          doc.addPage()
+          addHeaderFooter(currentPage, totalPages)
+
+          // Add title on first pictures page
+          if (i === 0) {
+            doc.setFontSize(18)
+            doc.text(sectionTitles.pictures || "Installation Pictures", 105, contentStartY, { align: "center" })
+            yPos = contentStartY + 15
+          } else {
+            yPos = contentStartY + 5
+          }
+
+          // Add images in 2x2 grid
+          const imageWidth = 85 // Width for each image
+          const imageHeight = 60 // Height for each image
+          const spacing = 10 // Spacing between images
+
+          for (let j = 0; j < pageImages.length; j++) {
+            const image = pageImages[j]
+            const row = Math.floor(j / 2)
+            const col = j % 2
+
+            const imgX = 15 + col * (imageWidth + spacing)
+            const imgY = yPos + row * (imageHeight + 25) // 25mm for image + caption space
+
+            try {
+              // Load and add image
+              if (image.url) {
+                // For Google Drive images, we need to handle them differently
+                if (image.googleDriveId) {
+                  // Create a placeholder for Google Drive images in PDF
+                  doc.setFillColor(240, 240, 240)
+                  doc.rect(imgX, imgY, imageWidth, imageHeight, "F")
+                  doc.setFontSize(10)
+                  doc.text("Google Drive Image", imgX + imageWidth / 2, imgY + imageHeight / 2, { align: "center" })
+                } else {
+                  // For blob URLs, try to add the image
+                  const img = new Image()
+                  img.crossOrigin = "anonymous"
+                  img.onload = () => {
+                    try {
+                      doc.addImage(img, "JPEG", imgX, imgY, imageWidth, imageHeight)
+                    } catch (error) {
+                      console.error("Error adding image to PDF:", error)
+                      // Add placeholder if image fails
+                      doc.setFillColor(240, 240, 240)
+                      doc.rect(imgX, imgY, imageWidth, imageHeight, "F")
+                      doc.setFontSize(10)
+                      doc.text("Image Error", imgX + imageWidth / 2, imgY + imageHeight / 2, { align: "center" })
+                    }
+                  }
+                  img.src = image.url
+                }
+              }
+
+              // Add caption below image
+              doc.setFontSize(9)
+              doc.setFont("helvetica", "bold")
+              doc.text(`Unit ${image.unit}`, imgX, imgY + imageHeight + 5)
+              doc.setFont("helvetica", "normal")
+              doc.setFontSize(8)
+              const captionLines = doc.splitTextToSize(image.caption || image.filename, imageWidth)
+              captionLines.forEach((line: string, lineIndex: number) => {
+                doc.text(line, imgX, imgY + imageHeight + 10 + lineIndex * 3)
+              })
+            } catch (error) {
+              console.error("Error processing image for PDF:", error)
+              // Add placeholder rectangle
+              doc.setFillColor(240, 240, 240)
+              doc.rect(imgX, imgY, imageWidth, imageHeight, "F")
+              doc.setFontSize(10)
+              doc.text("Image Unavailable", imgX + imageWidth / 2, imgY + imageHeight / 2, { align: "center" })
+            }
+          }
+
+          currentPage++
         }
       }
 

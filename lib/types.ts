@@ -25,3 +25,19 @@ export interface Note {
   unit: string
   note: string
 }
+
+export interface ImageData {
+  id: string
+  file: File | null
+  url: string
+  caption: string
+  unit: string
+  filename: string
+  googleDriveId?: string
+}
+
+export interface ProcessedImage extends ImageData {
+  matchedNotes: string[]
+  suggestedCaption: string
+  confidence: number
+}
