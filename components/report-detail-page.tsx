@@ -97,10 +97,8 @@ export default function ReportDetailPage({
       const unitB = unitColumn ? b[unitColumn] : b.Unit
 
       // Get edited unit numbers if they exist
-      const finalUnitA =
-        unitA !== undefined && editedUnits[unitA] !== undefined ? editedUnits[unitA] : unitA
-      const finalUnitB =
-        unitB !== undefined && editedUnits[unitB] !== undefined ? editedUnits[unitB] : unitB
+      const finalUnitA = unitA !== undefined && editedUnits[unitA] !== undefined ? editedUnits[unitA] : unitA
+      const finalUnitB = unitB !== undefined && editedUnits[unitB] !== undefined ? editedUnits[unitB] : unitB
 
       // Handle empty units - put them at the top
       if (!finalUnitA || finalUnitA.trim() === "") return -1
@@ -354,7 +352,7 @@ export default function ReportDetailPage({
     let selectedCells: Record<string, string[]> = {}
     let selectedNotesColumns: string[] = []
     try {
-      if (typeof window !== 'undefined') {
+      if (typeof window !== "undefined") {
         const storedSelectedCells = localStorage.getItem("selectedCells")
         const storedSelectedNotesColumns = localStorage.getItem("selectedNotesColumns")
         if (storedSelectedCells) selectedCells = JSON.parse(storedSelectedCells)
@@ -379,8 +377,12 @@ export default function ReportDetailPage({
     }
 
     // Check if unit was not accessed (all installation columns are empty)
-    const kitchenAerator = kitchenAeratorColumn ? getAeratorDescription(item[kitchenAeratorColumn] ?? "", "kitchen") : ""
-    const bathroomAerator = bathroomAeratorColumn ? getAeratorDescription(item[bathroomAeratorColumn] ?? "", "bathroom") : ""
+    const kitchenAerator = kitchenAeratorColumn
+      ? getAeratorDescription(item[kitchenAeratorColumn] ?? "", "kitchen")
+      : ""
+    const bathroomAerator = bathroomAeratorColumn
+      ? getAeratorDescription(item[bathroomAeratorColumn] ?? "", "bathroom")
+      : ""
     const shower = getShowerValue(item)
     const toilet = hasToiletInstalled(item) ? "0.8 GPF" : ""
 
@@ -535,7 +537,7 @@ export default function ReportDetailPage({
     if (isEditable) {
       // Use unified notes system
       updateStoredNote(unit, value)
-      
+
       // Also update local state for immediate UI update
       setEditedNotes((prev) => {
         const updated = { ...prev, [unit]: value }
@@ -696,7 +698,7 @@ export default function ReportDetailPage({
         const updatedRows = additionalRows.filter((row) => (unitColumn ? row[unitColumn] : row.Unit) !== unitValue)
         setAdditionalRows(updatedRows)
         localStorage.setItem("additionalDetailRows", JSON.stringify(updatedRows))
-        
+
         // Also remove the note from the unified notes system if it exists
         if (unitValue) {
           const storedNotes = getStoredNotes()
@@ -711,7 +713,7 @@ export default function ReportDetailPage({
         }
       } else {
         handleUnitEdit(unitValue ?? "", "")
-        
+
         // Also remove the note from the unified notes system if it exists
         if (unitValue) {
           const storedNotes = getStoredNotes()
@@ -937,21 +939,23 @@ export default function ReportDetailPage({
 
               // Get compiled notes (including "not accessed" for details section)
               const compiledNotes = compileNotesForUnit(item, true)
-                  const finalNote = getFinalNoteForUnit(unitValue ?? "", compiledNotes)
+              const finalNote = getFinalNoteForUnit(unitValue ?? "", compiledNotes)
 
               return (
                 <tr key={index}>
                   <td className="py-2 px-2 border-b">
                     {isEditable ? (
                       <EditableText
-                        value={editedUnits[unitValue ?? ""] !== undefined ? editedUnits[unitValue ?? ""] : unitValue ?? ""}
+                        value={
+                          editedUnits[unitValue ?? ""] !== undefined ? editedUnits[unitValue ?? ""] : (unitValue ?? "")
+                        }
                         onChange={(value) => handleUnitEdit(unitValue ?? "", value)}
                         placeholder="Unit number"
                       />
                     ) : editedUnits[unitValue ?? ""] !== undefined ? (
                       editedUnits[unitValue ?? ""]
                     ) : (
-                      unitValue ?? ""
+                      (unitValue ?? "")
                     )}
                   </td>
                   {hasKitchenAerators && (
@@ -1127,7 +1131,9 @@ export default function ReportDetailPage({
                   return (
                     <tr key={index}>
                       <td className="py-2 px-2 border-b">
-                        {unitValue !== undefined && editedUnits[unitValue] !== undefined ? editedUnits[unitValue] : unitValue}
+                        {unitValue !== undefined && editedUnits[unitValue] !== undefined
+                          ? editedUnits[unitValue]
+                          : unitValue}
                       </td>
                       {hasKitchenAerators && (
                         <td className="py-2 px-2 border-b text-center">

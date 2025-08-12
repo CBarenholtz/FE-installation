@@ -27,7 +27,7 @@ export const getAeratorDescription = (value: string, type: string) => {
   if (!value) return "No Touch."
 
   if (value === "1") return type === "shower" ? "1.75 GPM" : "1.0 GPM"
-  if (value === "2") return type === "shower" ? "1.75 GPM" : "1.0 GPM"
+  if (value === "2") return type === "shower" ? "1.75 GPM (2)" : "1.0 GPM (2)"
 
   // If it's a text value that indicates installation
   if (isAeratorInstalled(value)) {

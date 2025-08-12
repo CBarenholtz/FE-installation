@@ -1,102 +1,78 @@
 "use client"
-
-import type React from "react"
-
-import { useState, useRef, useEffect } from "react"
+import { useState } from "react"
 
 interface EditableTextProps {
   value: string
   onChange: (value: string) => void
+  placeholder?: string
   className?: string
   multiline?: boolean
-  placeholder?: string
-  displayValue?: string // Add this new prop
 }
 
 export default function EditableText({
   value,
   onChange,
+  placeholder = "",
   className = "",
   multiline = false,
-  placeholder = "Click to edit",
-  displayValue, // Add this parameter
 }: EditableTextProps) {
   const [isEditing, setIsEditing] = useState(false)
-  const [text, setText] = useState(value)
-  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null)
-  // Remove this line:
-  // const { setHasUnsavedChanges } = useReportContext()
+  const [editValue, setEditValue] = useState(value)
 
-  // Update local state when prop value changes
-  useEffect(() => {
-    setText(value)
-  }, [value])
-
-  const handleClick = () => {
-    setIsEditing(true)
-  }
-
-  const handleBlur = () => {
+  const handleSave = () => {
+    onChange(editValue)
     setIsEditing(false)
-    if (text !== value) {
-      onChange(text)
-      // Remove this line:
-      // setHasUnsavedChanges(true)
-      console.log(`Text changed from "${value}" to "${text}"`)
-    }
   }
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setText(e.target.value)
+  const handleCancel = () => {
+    setEditValue(value)
+    setIsEditing(false)
   }
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !multiline) {
-      e.preventDefault()
-      inputRef.current?.blur()
-    }
-  }
-
-  useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus()
-    }
-  }, [isEditing])
 
   if (isEditing) {
-    if (multiline) {
-      return (
-        <textarea
-          ref={inputRef as React.RefObject<HTMLTextAreaElement>}
-          value={text}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          className={`w-full p-1 border border-gray-300 rounded ${className}`}
-          rows={Math.max(3, text.split("\n").length)}
-          placeholder={placeholder}
-        />
-      )
-    }
-    return (
-      <input
-        ref={inputRef as React.RefObject<HTMLInputElement>}
-        type="text"
-        value={text}
-        onChange={handleChange}
-        onBlur={handleBlur}
-        onKeyDown={handleKeyDown}
-        className={`w-full p-1 border border-gray-300 rounded ${className}`}
+    return multiline ? (
+      <textarea
+        value={editValue}
+        onChange={(e) => setEditValue(e.target.value)}
+        onBlur={handleSave}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault()
+            handleSave()
+          }
+          if (e.key === "Escape") {
+            handleCancel()
+          }
+        }}
+        className={`border rounded px-2 py-1 ${className}`}
         placeholder={placeholder}
+        autoFocus
+        rows={3}
+      />
+    ) : (
+      <input
+        type="text"
+        value={editValue}
+        onChange={(e) => setEditValue(e.target.value)}
+        onBlur={handleSave}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            handleSave()
+          }
+          if (e.key === "Escape") {
+            handleCancel()
+          }
+        }}
+        className={`border rounded px-2 py-1 ${className}`}
+        placeholder={placeholder}
+        autoFocus
       />
     )
   }
 
   return (
-    <div
-      onClick={handleClick}
-      className={`cursor-pointer hover:bg-gray-100 p-1 rounded ${className} ${!value ? "text-gray-400 italic" : ""}`}
-    >
-      {displayValue || value || placeholder}
-    </div>
+    <span onClick={() => setIsEditing(true)} className={`cursor-pointer hover:bg-gray-100 px-1 rounded ${className}`}>
+      {value || placeholder}
+    </span>
   )
 }
