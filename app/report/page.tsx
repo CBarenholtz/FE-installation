@@ -11,6 +11,7 @@ import ReportLetterPage from "@/components/report-letter-page"
 import ReportNotesPage from "@/components/report-notes-page"
 import ReportDetailPage from "@/components/report-detail-page"
 import EnhancedPdfButton from "@/components/enhanced-pdf-button"
+import ExcelExportButton from "@/components/excel-export-button"
 import { ReportProvider, useReportContext } from "@/lib/report-context"
 import type { CustomerInfo, InstallationData, Note } from "@/lib/types"
 
@@ -64,6 +65,12 @@ function ReportView({
           Back to Form
         </Button>
         <div className="flex flex-wrap gap-2">
+          <ExcelExportButton
+            customerInfo={customerInfo}
+            installationData={installationData}
+            toiletCount={toiletCount}
+            notes={notes}
+          />
           <EnhancedPdfButton
             customerInfo={customerInfo}
             installationData={installationData}
