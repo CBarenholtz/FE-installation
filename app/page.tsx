@@ -1,11 +1,15 @@
 "use client"
 
+import type React from "react"
+
 import { useEffect, useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { useRouter } from "next/navigation"
-import { ChevronLeft } from "lucide-react"
+import { ChevronLeft, Upload } from "lucide-react"
 import ReportCoverPage from "@/components/report-cover-page"
 import ReportLetterPage from "@/components/report-letter-page"
 import ReportNotesPage from "@/components/report-notes-page"
@@ -15,7 +19,209 @@ import ExcelExportButton from "@/components/excel-export-button"
 import ImageUpload from "@/components/image-upload"
 import ReportPicturesPage from "@/components/report-pictures-page"
 import { ReportProvider, useReportContext } from "@/lib/report-context"
+import { parseExcelFile } from "@/lib/excel-parser"
 import type { CustomerInfo, InstallationData, Note, ImageData } from "@/lib/types"
+
+function UploadForm() {
+  const router = useRouter()
+  const [file, setFile] = useState<File | null>(null)
+  const [customerInfo, setCustomerInfo] = useState({
+    customerName: "",
+    propertyName: "",
+    address: "",
+    city: "",
+    state: "",
+    zip: "",
+    unitType: "Unit" as "Unit" | "Room",
+  })
+  const [coverImage, setCoverImage] = useState<File | null>(null)
+  const [isProcessing, setIsProcessing] = useState(false)
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0]
+    if (selectedFile) {
+      setFile(selectedFile)
+    }
+  }
+
+  const handleCoverImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0]
+    if (selectedFile) {
+      setCoverImage(selectedFile)
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!file) {
+      alert("Please select a file to upload")
+      return
+    }
+
+    if (!customerInfo.customerName || !customerInfo.propertyName || !customerInfo.address) {
+      alert("Please fill in all required customer information fields")
+      return
+    }
+
+    setIsProcessing(true)
+
+    try {
+      // Parse the Excel file
+      const installationData = await parseExcelFile(file)
+
+      if (installationData.length === 0) {
+        alert("No valid installation data found in the file")
+        setIsProcessing(false)
+        return
+      }
+
+      // Count toilets
+      const toiletCount = installationData.filter((item) => {
+        const toiletColumn = Object.keys(item).find((key) => key.startsWith("Toilets Installed:"))
+        return toiletColumn && item[toiletColumn] && item[toiletColumn] !== ""
+      }).length
+
+      // Store data in localStorage
+      localStorage.setItem("installationData", JSON.stringify(installationData))
+      localStorage.setItem("toiletCount", JSON.stringify(toiletCount))
+      localStorage.setItem("customerInfo", JSON.stringify(customerInfo))
+
+      // Handle cover image if provided
+      if (coverImage) {
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          const imageData = e.target?.result as string
+          localStorage.setItem("coverImage", imageData)
+          // Navigate to report view
+          window.location.reload()
+        }
+        reader.readAsDataURL(coverImage)
+      } else {
+        // Navigate to report view
+        window.location.reload()
+      }
+    } catch (error) {
+      console.error("Error processing file:", error)
+      alert("Error processing file. Please check the file format and try again.")
+      setIsProcessing(false)
+    }
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <Card>
+        <CardContent className="pt-6">
+          <h1 className="text-2xl font-bold mb-6">Water Installation Report Generator</h1>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Customer Information */}
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold">Customer Information</h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="customerName">Customer Name *</Label>
+                  <Input
+                    id="customerName"
+                    value={customerInfo.customerName}
+                    onChange={(e) => setCustomerInfo((prev) => ({ ...prev, customerName: e.target.value }))}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="propertyName">Property Name *</Label>
+                  <Input
+                    id="propertyName"
+                    value={customerInfo.propertyName}
+                    onChange={(e) => setCustomerInfo((prev) => ({ ...prev, propertyName: e.target.value }))}
+                    required
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <Label htmlFor="address">Address *</Label>
+                  <Input
+                    id="address"
+                    value={customerInfo.address}
+                    onChange={(e) => setCustomerInfo((prev) => ({ ...prev, address: e.target.value }))}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="city">City</Label>
+                  <Input
+                    id="city"
+                    value={customerInfo.city}
+                    onChange={(e) => setCustomerInfo((prev) => ({ ...prev, city: e.target.value }))}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="state">State</Label>
+                  <Input
+                    id="state"
+                    value={customerInfo.state}
+                    onChange={(e) => setCustomerInfo((prev) => ({ ...prev, state: e.target.value }))}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="zip">ZIP Code</Label>
+                  <Input
+                    id="zip"
+                    value={customerInfo.zip}
+                    onChange={(e) => setCustomerInfo((prev) => ({ ...prev, zip: e.target.value }))}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="unitType">Unit Type</Label>
+                  <select
+                    id="unitType"
+                    value={customerInfo.unitType}
+                    onChange={(e) =>
+                      setCustomerInfo((prev) => ({ ...prev, unitType: e.target.value as "Unit" | "Room" }))
+                    }
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                  >
+                    <option value="Unit">Unit</option>
+                    <option value="Room">Room</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Cover Image Upload */}
+            <div>
+              <Label htmlFor="coverImage">Cover Image (Optional)</Label>
+              <Input id="coverImage" type="file" accept="image/*" onChange={handleCoverImageChange} />
+            </div>
+
+            {/* File Upload */}
+            <div>
+              <Label htmlFor="file">Excel/CSV File *</Label>
+              <Input id="file" type="file" accept=".csv,.xlsx,.xls" onChange={handleFileChange} required />
+            </div>
+
+            <Button type="submit" disabled={isProcessing} className="w-full">
+              {isProcessing ? (
+                <>Processing...</>
+              ) : (
+                <>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Generate Report
+                </>
+              )}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
 
 // Loading component - separate component for loading state
 function LoadingState() {
@@ -26,21 +232,8 @@ function LoadingState() {
   )
 }
 
-// No data component - separate component for no data state
 function NoDataState({ onBack }: { onBack: () => void }) {
-  return (
-    <div className="container mx-auto px-4 py-8">
-      <Card>
-        <CardContent className="pt-6">
-          <h2 className="text-xl font-semibold mb-4">No Data Found</h2>
-          <p className="mb-4">
-            No installation data or customer information found. Please go back and submit the form.
-          </p>
-          <Button onClick={onBack}>Back to Form</Button>
-        </CardContent>
-      </Card>
-    </div>
-  )
+  return <UploadForm />
 }
 
 // Report view component - separate component for the actual report
