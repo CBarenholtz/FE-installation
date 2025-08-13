@@ -1,11 +1,15 @@
 "use client"
 
+import type React from "react"
+
 import { useEffect, useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useRouter } from "next/navigation"
-import { ChevronLeft } from "lucide-react"
+import { ChevronLeft, Upload } from "lucide-react"
 import ReportCoverPage from "@/components/report-cover-page"
 import ReportLetterPage from "@/components/report-letter-page"
 import ReportNotesPage from "@/components/report-notes-page"
@@ -15,6 +19,7 @@ import ExcelExportButton from "@/components/excel-export-button"
 import ImageUpload from "@/components/image-upload"
 import ReportPicturesPage from "@/components/report-pictures-page"
 import { ReportProvider, useReportContext } from "@/lib/report-context"
+import { parseExcelFile } from "@/lib/excel-parser"
 import type { CustomerInfo, InstallationData, Note, ImageData } from "@/lib/types"
 
 // Loading component - separate component for loading state
@@ -27,20 +32,8 @@ function LoadingState() {
 }
 
 // No data component - separate component for no data state
-function NoDataState({ onBack }: { onBack: () => void }) {
-  return (
-    <div className="container mx-auto px-4 py-8">
-      <Card>
-        <CardContent className="pt-6">
-          <h2 className="text-xl font-semibold mb-4">No Data Found</h2>
-          <p className="mb-4">
-            No installation data or customer information found. Please go back and submit the form.
-          </p>
-          <Button onClick={onBack}>Back to Form</Button>
-        </CardContent>
-      </Card>
-    </div>
-  )
+function NoDataState({ onDataProcessed }: { onDataProcessed: (data: any) => void }) {
+  return <UploadForm onDataProcessed={onDataProcessed} />
 }
 
 // Report view component - separate component for the actual report
@@ -203,10 +196,132 @@ function ReportView({
   )
 }
 
+function UploadForm({ onDataProcessed }: { onDataProcessed: (data: any) => void }) {
+  const [file, setFile] = useState<File | null>(null)
+  const [customerInfo, setCustomerInfo] = useState<CustomerInfo>({
+    propertyAddress: "",
+    propertyManager: "",
+    contactInfo: "",
+    date: new Date().toISOString().split("T")[0],
+  })
+  const [processing, setProcessing] = useState(false)
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0]
+    if (selectedFile) {
+      setFile(selectedFile)
+    }
+  }
+
+  const handleCustomerInfoChange = (field: keyof CustomerInfo, value: string) => {
+    setCustomerInfo((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!file || !customerInfo.propertyAddress) {
+      alert("Please select an Excel file and fill in the property address.")
+      return
+    }
+
+    setProcessing(true)
+    try {
+      const result = await parseExcelFile(file)
+
+      // Store data in localStorage
+      localStorage.setItem("installationData", JSON.stringify(result.data))
+      localStorage.setItem("toiletCount", JSON.stringify(result.toiletCount))
+      localStorage.setItem("customerInfo", JSON.stringify(customerInfo))
+
+      onDataProcessed({
+        installationData: result.data,
+        toiletCount: result.toiletCount,
+        customerInfo,
+      })
+    } catch (error) {
+      console.error("Error processing file:", error)
+      alert("Error processing Excel file. Please check the file format and try again.")
+    } finally {
+      setProcessing(false)
+    }
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-8 max-w-2xl">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Upload className="h-5 w-5" />
+            Water Installation Report Generator
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="excel-file">Excel File</Label>
+              <Input id="excel-file" type="file" accept=".xlsx,.xls" onChange={handleFileChange} required />
+              <p className="text-sm text-muted-foreground">Upload your water installation data Excel file</p>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Customer Information</h3>
+
+              <div className="space-y-2">
+                <Label htmlFor="property-address">Property Address *</Label>
+                <Input
+                  id="property-address"
+                  value={customerInfo.propertyAddress}
+                  onChange={(e) => handleCustomerInfoChange("propertyAddress", e.target.value)}
+                  placeholder="Enter property address"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="property-manager">Property Manager</Label>
+                <Input
+                  id="property-manager"
+                  value={customerInfo.propertyManager}
+                  onChange={(e) => handleCustomerInfoChange("propertyManager", e.target.value)}
+                  placeholder="Enter property manager name"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="contact-info">Contact Information</Label>
+                <Input
+                  id="contact-info"
+                  value={customerInfo.contactInfo}
+                  onChange={(e) => handleCustomerInfoChange("contactInfo", e.target.value)}
+                  placeholder="Enter contact information"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="date">Date</Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={customerInfo.date}
+                  onChange={(e) => handleCustomerInfoChange("date", e.target.value)}
+                />
+              </div>
+            </div>
+
+            <Button type="submit" disabled={processing} className="w-full">
+              {processing ? "Processing..." : "Generate Report"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 // Main content component
 function ReportContent() {
   const router = useRouter()
-  const { customerInfo, toiletCount, setToiletCount, notes, setNotes } = useReportContext()
+  const { customerInfo, toiletCount, setToiletCount, notes, setNotes, setCustomerInfo } = useReportContext()
 
   const [installationData, setInstallationData] = useState<InstallationData[]>([])
   const [loading, setLoading] = useState(true)
@@ -214,16 +329,25 @@ function ReportContent() {
   const [filteredData, setFilteredData] = useState<InstallationData[]>([])
   const [reportNotes, setReportNotes] = useState<Note[]>([])
 
+  const handleDataProcessed = (data: any) => {
+    setInstallationData(data.installationData)
+    setToiletCount(data.toiletCount)
+    setCustomerInfo(data.customerInfo)
+    setLoading(false)
+  }
+
   const handleBack = () => {
-    console.log("Back button clicked - attempting navigation")
+    console.log("Back button clicked - resetting to upload form")
     try {
-      // Only clear data if user explicitly wants to start fresh
-      router.push("/")
-      console.log("Navigation initiated")
+      setInstallationData([])
+      setToiletCount(0)
+      setCustomerInfo(null)
+      setLoading(false)
+      console.log("State reset to show original upload form")
     } catch (error) {
       console.error("Error in handleBack:", error)
-      // Fallback: reload the page to root
-      window.location.href = "/"
+      // Fallback: reload the page
+      window.location.reload()
     }
   }
 
@@ -238,9 +362,11 @@ function ReportContent() {
       localStorage.removeItem("reportNotes")
       console.log("Cleared all localStorage data")
 
-      // Navigate back to home
-      router.push("/")
-      console.log("Navigation initiated after clearing data")
+      // Reset state to show upload form
+      setInstallationData([])
+      setToiletCount(0)
+      setCustomerInfo(null)
+      setLoading(false)
     } catch (error) {
       console.error("Error in handleClearAllData:", error)
       // Fallback: reload the page to root
@@ -354,10 +480,10 @@ function ReportContent() {
   }
 
   if (!customerInfo || installationData.length === 0) {
-    console.log("Rendering no data state:")
+    console.log("Rendering upload form:")
     console.log("- Customer info exists:", !!customerInfo)
     console.log("- Installation data length:", installationData.length)
-    return <NoDataState onBack={handleBack} />
+    return <NoDataState onDataProcessed={handleDataProcessed} />
   }
 
   console.log("Rendering report view with data")
