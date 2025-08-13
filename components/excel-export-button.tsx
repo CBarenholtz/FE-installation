@@ -49,10 +49,40 @@ export default function ExcelExportButton({
       console.log("Starting Excel export...")
 
       // Load latest data from localStorage
-      const latestEditedUnits = JSON.parse(localStorage.getItem("editedUnits") || "{}")
+      const latestEditedUnits = (() => {
+        try {
+          const stored = localStorage.getItem("editedUnits")
+          if (!stored || stored === "undefined") return {}
+          return JSON.parse(stored)
+        } catch (error) {
+          console.error("Error parsing editedUnits:", error)
+          return {}
+        }
+      })()
+
       const latestEditedNotes = getStoredNotes()
-      const latestEditedInstallations = JSON.parse(localStorage.getItem("detailInstallations") || "{}")
-      const latestColumnHeaders = JSON.parse(localStorage.getItem("columnHeaders") || "{}")
+
+      const latestEditedInstallations = (() => {
+        try {
+          const stored = localStorage.getItem("detailInstallations")
+          if (!stored || stored === "undefined") return {}
+          return JSON.parse(stored)
+        } catch (error) {
+          console.error("Error parsing detailInstallations:", error)
+          return {}
+        }
+      })()
+
+      const latestColumnHeaders = (() => {
+        try {
+          const stored = localStorage.getItem("columnHeaders")
+          if (!stored || stored === "undefined") return {}
+          return JSON.parse(stored)
+        } catch (error) {
+          console.error("Error parsing columnHeaders:", error)
+          return {}
+        }
+      })()
 
       let picturesData: any[] = []
       try {

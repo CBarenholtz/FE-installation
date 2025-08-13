@@ -213,12 +213,12 @@ export default function ReportNotesPage({ notes, isPreview = true, isEditable = 
       const storedSelectedCells = localStorage.getItem("selectedCells")
       const storedSelectedNotesColumns = localStorage.getItem("selectedNotesColumns")
 
-      if (storedSelectedCells) {
+      if (storedSelectedCells && storedSelectedCells !== "undefined") {
         selectedCells = JSON.parse(storedSelectedCells)
         console.log("Notes: Loaded selected cells from preview:", selectedCells)
       }
 
-      if (storedSelectedNotesColumns) {
+      if (storedSelectedNotesColumns && storedSelectedNotesColumns !== "undefined") {
         selectedNotesColumns = JSON.parse(storedSelectedNotesColumns)
         console.log("Notes: Loaded selected notes columns from preview:", selectedNotesColumns)
       }
@@ -267,11 +267,11 @@ export default function ReportNotesPage({ notes, isPreview = true, isEditable = 
             const storedSelectedCells = localStorage.getItem("selectedCells")
             const storedSelectedNotesColumns = localStorage.getItem("selectedNotesColumns")
 
-            if (storedSelectedCells) {
+            if (storedSelectedCells && storedSelectedCells !== "undefined") {
               selectedCells = JSON.parse(storedSelectedCells)
             }
 
-            if (storedSelectedNotesColumns) {
+            if (storedSelectedNotesColumns && storedSelectedNotesColumns !== "undefined") {
               selectedNotesColumns = JSON.parse(storedSelectedNotesColumns)
             }
           } catch (error) {
@@ -374,7 +374,17 @@ export default function ReportNotesPage({ notes, isPreview = true, isEditable = 
         // If this is a new unit being added, ensure it appears in the details section
         if (value && value.trim() !== "" && oldUnit === "") {
           // Add the unit to the details section as an additional row
-          const additionalRows = JSON.parse(localStorage.getItem("additionalDetailRows") || "[]")
+          const additionalRows = (() => {
+            try {
+              const stored = localStorage.getItem("additionalDetailRows")
+              if (!stored || stored === "undefined") return []
+              return JSON.parse(stored)
+            } catch (error) {
+              console.error("Error parsing additionalDetailRows:", error)
+              return []
+            }
+          })()
+
           const unitColumn = findUnitColumn(installationData)
 
           // Check if this unit already exists in additional rows
@@ -475,7 +485,17 @@ export default function ReportNotesPage({ notes, isPreview = true, isEditable = 
         localStorage.setItem("unifiedNotes", JSON.stringify(updatedStoredNotes))
 
         // Also remove the unit from the details section if it was added there
-        const additionalRows = JSON.parse(localStorage.getItem("additionalDetailRows") || "[]")
+        const additionalRows = (() => {
+          try {
+            const stored = localStorage.getItem("additionalDetailRows")
+            if (!stored || stored === "undefined") return []
+            return JSON.parse(stored)
+          } catch (error) {
+            console.error("Error parsing additionalDetailRows:", error)
+            return []
+          }
+        })()
+
         const unitColumn = findUnitColumn(installationData)
 
         // Find and remove the row from additional rows
