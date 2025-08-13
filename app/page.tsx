@@ -376,14 +376,14 @@ function ReportContent() {
     localStorage.removeItem("selectedCells")
     localStorage.removeItem("selectedNotesColumns")
 
-    // Reset component state
     setInstallationData([])
     setFilteredData([])
     setReportNotes([])
     setLoading(true)
 
-    // Trigger a reload of the data which will now show the upload form
-    router.push("/")
+    setTimeout(() => {
+      loadData()
+    }, 100)
   }
 
   // Load data from localStorage
@@ -399,7 +399,6 @@ function ReportContent() {
         setInstallationData(parsedInstallationData)
         setToiletCount(parsedToiletCount)
 
-        // Log the schema of the CSV data
         if (parsedInstallationData && parsedInstallationData.length > 0) {
           const firstItem = parsedInstallationData[0]
           const schema = Object.keys(firstItem).map((key) => ({
@@ -410,10 +409,8 @@ function ReportContent() {
           setCsvSchema(schema)
         }
 
-        // The data is already filtered and sorted from the CSV preview page
         setFilteredData(parsedInstallationData)
 
-        // Group notes for the notes pages - only include leak issues and custom notes
         const notes = parsedInstallationData
           .filter(
             (item: InstallationData) =>
@@ -431,7 +428,6 @@ function ReportContent() {
               noteText += "Moderate leak from tub spout/diverter. "
             if (item["Tub Spout/Diverter Leak Issue"] === "Heavy") noteText += "Heavy leak from tub spout/ diverter. "
 
-            // Add custom notes from CSV preview (this includes selected cells and columns)
             if (item.Notes && item.Notes.trim() !== "") {
               noteText += item.Notes + " "
             }
@@ -441,7 +437,7 @@ function ReportContent() {
               note: noteText.trim(),
             }
           })
-          .filter((note: Note) => note.note !== "") // Remove notes that are empty after filtering
+          .filter((note: Note) => note.note !== "")
 
         console.log("Report: Generated notes from installation data:", notes)
         setReportNotes(notes)
@@ -453,19 +449,16 @@ function ReportContent() {
     }
   }, [setToiletCount])
 
-  // Load data on component mount
   useEffect(() => {
     loadData()
   }, [loadData])
 
-  // Update notes in context if they've changed
   useEffect(() => {
     if (JSON.stringify(reportNotes) !== JSON.stringify(notes)) {
       setNotes(reportNotes)
     }
   }, [reportNotes, notes, setNotes])
 
-  // Render appropriate component based on state
   if (loading) {
     return <LoadingState />
   }
