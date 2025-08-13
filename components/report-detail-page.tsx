@@ -1005,20 +1005,53 @@ export default function ReportDetailPage({
                 (row) => (unitColumn ? row[unitColumn] : row.Unit) === unitValue,
               )
 
-              // Get values for display with consolidated counts
-              const kitchenCount = item._kitchenCount || 0
-              const bathroomCount = item._bathroomCount || 0
-              const showerCount = item._showerCount || 0
-              const toiletCount = item._toiletCount || 0
+              // Get values for display with flexible quantity logic
+              const getFlexibleAeratorDescription = (
+                originalValue: string,
+                consolidatedCount: number,
+                type: "kitchen" | "bathroom" | "shower",
+              ) => {
+                const original = String(originalValue || "").trim()
 
-              const kitchenAerator =
-                kitchenAeratorColumn && kitchenCount > 0 ? getAeratorDescription(String(kitchenCount), "kitchen") : ""
-              const bathroomAerator =
-                bathroomAeratorColumn && bathroomCount > 0
-                  ? getAeratorDescription(String(bathroomCount), "bathroom")
-                  : ""
-              const shower = showerCount > 0 ? getAeratorDescription(String(showerCount), "shower") : "No Touch."
-              const toilet = toiletCount > 0 ? (toiletCount > 1 ? `0.8 GPF (${toiletCount})` : "0.8 GPF") : ""
+                // If original Excel value is "2", use it directly
+                if (original === "2") {
+                  return getAeratorDescription("2", type)
+                }
+
+                // If original is "1" but we have multiple consolidated entries, use consolidated count
+                if (original === "1" && consolidatedCount > 1) {
+                  return getAeratorDescription(String(consolidatedCount), type)
+                }
+
+                // Otherwise use original value
+                return getAeratorDescription(original, type)
+              }
+
+              const kitchenAerator = kitchenAeratorColumn
+                ? getFlexibleAeratorDescription(item[kitchenAeratorColumn] ?? "", item._kitchenCount || 0, "kitchen")
+                : ""
+              const bathroomAerator = bathroomAeratorColumn
+                ? getFlexibleAeratorDescription(item[bathroomAeratorColumn] ?? "", item._bathroomCount || 0, "bathroom")
+                : ""
+              const shower = (() => {
+                // Handle shower with flexible logic
+                const originalShowerValue = getShowerValue(item)
+                if (originalShowerValue === "No Touch.") return "No Touch."
+
+                // Extract the original Excel value for shower
+                const showerColumns = findAllShowerColumns()
+                let originalValue = ""
+                for (const column of showerColumns) {
+                  const value = item[column]
+                  if (value && String(value).trim() !== "" && String(value).trim() !== "0") {
+                    originalValue = String(value).trim()
+                    break
+                  }
+                }
+
+                return getFlexibleAeratorDescription(originalValue, item._showerCount || 0, "shower")
+              })()
+              const toilet = hasToiletInstalled(item) ? "0.8 GPF" : ""
 
               // Get compiled notes (use consolidated notes if available)
               const compiledNotes = item._consolidatedNotes || compileNotesForUnit(item, true)
@@ -1199,21 +1232,61 @@ export default function ReportDetailPage({
               <tbody>
                 {pageData.map((item, index) => {
                   const unitValue = unitColumn ? item[unitColumn] : item.Unit
-                  const kitchenCount = item._kitchenCount || 0
-                  const bathroomCount = item._bathroomCount || 0
-                  const showerCount = item._showerCount || 0
-                  const toiletCount = item._toiletCount || 0
 
-                  const kitchenAerator =
-                    kitchenAeratorColumn && kitchenCount > 0
-                      ? getAeratorDescription(String(kitchenCount), "kitchen")
-                      : ""
-                  const bathroomAerator =
-                    bathroomAeratorColumn && bathroomCount > 0
-                      ? getAeratorDescription(String(bathroomCount), "bathroom")
-                      : ""
-                  const shower = showerCount > 0 ? getAeratorDescription(String(showerCount), "shower") : "No Touch."
-                  const toilet = toiletCount > 0 ? (toiletCount > 1 ? `0.8 GPF (${toiletCount})` : "0.8 GPF") : ""
+                  const getFlexibleAeratorDescription = (
+                    originalValue: string,
+                    consolidatedCount: number,
+                    type: "kitchen" | "bathroom" | "shower",
+                  ) => {
+                    const original = String(originalValue || "").trim()
+
+                    // If original Excel value is "2", use it directly
+                    if (original === "2") {
+                      return getAeratorDescription("2", type)
+                    }
+
+                    // If original is "1" but we have multiple consolidated entries, use consolidated count
+                    if (original === "1" && consolidatedCount > 1) {
+                      return getAeratorDescription(String(consolidatedCount), type)
+                    }
+
+                    // Otherwise use original value
+                    return getAeratorDescription(original, type)
+                  }
+
+                  const kitchenAerator = kitchenAeratorColumn
+                    ? getFlexibleAeratorDescription(
+                        item[kitchenAeratorColumn] ?? "",
+                        item._kitchenCount || 0,
+                        "kitchen",
+                      )
+                    : ""
+                  const bathroomAerator = bathroomAeratorColumn
+                    ? getFlexibleAeratorDescription(
+                        item[bathroomAeratorColumn] ?? "",
+                        item._bathroomCount || 0,
+                        "bathroom",
+                      )
+                    : ""
+                  const shower = (() => {
+                    // Handle shower with flexible logic
+                    const originalShowerValue = getShowerValue(item)
+                    if (originalShowerValue === "No Touch.") return "No Touch."
+
+                    // Extract the original Excel value for shower
+                    const showerColumns = findAllShowerColumns()
+                    let originalValue = ""
+                    for (const column of showerColumns) {
+                      const value = item[column]
+                      if (value && String(value).trim() !== "" && String(value).trim() !== "0") {
+                        originalValue = String(value).trim()
+                        break
+                      }
+                    }
+
+                    return getFlexibleAeratorDescription(originalValue, item._showerCount || 0, "shower")
+                  })()
+                  const toilet = hasToiletInstalled(item) ? "0.8 GPF" : ""
 
                   const compiledNotes = item._consolidatedNotes || compileNotesForUnit(item, true)
                   const finalNote = getFinalNoteForUnit(unitValue ?? "", compiledNotes)
