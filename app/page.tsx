@@ -76,6 +76,13 @@ function ReportView({
     localStorage.setItem("reportImages", JSON.stringify(uploadedImages))
   }
 
+  useEffect(() => {
+    console.log("ReportView: Components loaded successfully")
+    console.log("ReportView: ExcelExportButton available:", !!ExcelExportButton)
+    console.log("ReportView: ImageUpload available:", !!ImageUpload)
+    console.log("ReportView: ReportPicturesPage available:", !!ReportPicturesPage)
+  }, [])
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-8 print:hidden">
@@ -84,12 +91,16 @@ function ReportView({
           Back to Form
         </Button>
         <div className="flex flex-wrap gap-2">
-          <ExcelExportButton
-            customerInfo={customerInfo}
-            installationData={installationData}
-            toiletCount={toiletCount}
-            notes={notes}
-          />
+          {ExcelExportButton ? (
+            <ExcelExportButton
+              customerInfo={customerInfo}
+              installationData={installationData}
+              toiletCount={toiletCount}
+              notes={notes}
+            />
+          ) : (
+            <div className="text-red-500 text-sm">Excel Export Not Available</div>
+          )}
           <EnhancedPdfButton
             customerInfo={customerInfo}
             installationData={installationData}
@@ -101,12 +112,26 @@ function ReportView({
 
       <div className="print:hidden">
         <Tabs value={currentPage} onValueChange={setCurrentPage}>
-          <TabsList className="grid grid-cols-5">
-            <TabsTrigger value="cover">Cover Page</TabsTrigger>
-            <TabsTrigger value="letter">Letter Page</TabsTrigger>
-            <TabsTrigger value="notes">Notes Pages</TabsTrigger>
-            <TabsTrigger value="details">Detail Pages</TabsTrigger>
-            <TabsTrigger value="pictures">Pictures</TabsTrigger>
+          <TabsList className="grid grid-cols-2 md:grid-cols-5 w-full">
+            <TabsTrigger value="cover" className="text-xs md:text-sm">
+              Cover
+            </TabsTrigger>
+            <TabsTrigger value="letter" className="text-xs md:text-sm">
+              Letter
+            </TabsTrigger>
+            <TabsTrigger value="notes" className="text-xs md:text-sm">
+              Notes
+            </TabsTrigger>
+            <TabsTrigger value="details" className="text-xs md:text-sm">
+              Details
+            </TabsTrigger>
+            {ImageUpload && ReportPicturesPage ? (
+              <TabsTrigger value="pictures" className="text-xs md:text-sm">
+                Pictures
+              </TabsTrigger>
+            ) : (
+              <div className="text-red-500 text-xs p-2">Pictures Unavailable</div>
+            )}
           </TabsList>
 
           <TabsContent value="cover">
@@ -127,14 +152,20 @@ function ReportView({
 
           <TabsContent value="pictures">
             <div className="space-y-6">
-              <ImageUpload
-                onImagesUploaded={handleImagesUploaded}
-                existingImages={images}
-                installationData={installationData}
-                notes={notes}
-              />
+              {ImageUpload ? (
+                <ImageUpload
+                  onImagesUploaded={handleImagesUploaded}
+                  existingImages={images}
+                  installationData={installationData}
+                  notes={notes}
+                />
+              ) : (
+                <div className="text-red-500 p-4 border rounded">
+                  Image Upload component not available. Check console for errors.
+                </div>
+              )}
 
-              {images.length > 0 && (
+              {images.length > 0 && ReportPicturesPage && (
                 <div className="border-t pt-6">
                   <h3 className="text-lg font-semibold mb-4">Pictures Report Preview</h3>
                   <ReportPicturesPage isPreview={true} isEditable={true} />
