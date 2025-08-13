@@ -251,12 +251,22 @@ function ReportContent() {
   // Load data from localStorage
   const loadData = useCallback(() => {
     try {
+      console.log("Loading data from localStorage...")
+
       const storedInstallationData = localStorage.getItem("installationData")
       const storedToiletCount = localStorage.getItem("toiletCount")
+      const storedCustomerInfo = localStorage.getItem("customerInfo")
+
+      console.log("Stored installation data exists:", !!storedInstallationData)
+      console.log("Stored toilet count exists:", !!storedToiletCount)
+      console.log("Stored customer info exists:", !!storedCustomerInfo)
 
       if (storedInstallationData && storedToiletCount) {
         const parsedInstallationData = JSON.parse(storedInstallationData)
         const parsedToiletCount = JSON.parse(storedToiletCount)
+
+        console.log("Parsed installation data length:", parsedInstallationData?.length || 0)
+        console.log("Parsed toilet count:", parsedToiletCount)
 
         setInstallationData(parsedInstallationData)
         setToiletCount(parsedToiletCount)
@@ -270,6 +280,7 @@ function ReportContent() {
             exampleValue: firstItem[key],
           }))
           setCsvSchema(schema)
+          console.log("CSV schema loaded:", schema.length, "columns")
         }
 
         // The data is already filtered and sorted from the CSV preview page
@@ -305,13 +316,22 @@ function ReportContent() {
           })
           .filter((note: Note) => note.note !== "") // Remove notes that are empty after filtering
 
-        console.log("Report: Generated notes from installation data:", notes)
+        console.log("Report: Generated notes from installation data:", notes.length, "notes")
         setReportNotes(notes)
+
+        console.log("Data loading completed successfully")
+      } else {
+        console.log("Missing required data in localStorage:")
+        console.log("- Installation data missing:", !storedInstallationData)
+        console.log("- Toilet count missing:", !storedToiletCount)
+        console.log("- Customer info missing:", !storedCustomerInfo)
       }
     } catch (error) {
       console.error("Error loading data:", error)
+      console.error("Error details:", error.message)
     } finally {
       setLoading(false)
+      console.log("Loading state set to false")
     }
   }, [setToiletCount])
 
@@ -329,13 +349,18 @@ function ReportContent() {
 
   // Render appropriate component based on state
   if (loading) {
+    console.log("Rendering loading state")
     return <LoadingState />
   }
 
   if (!customerInfo || installationData.length === 0) {
+    console.log("Rendering no data state:")
+    console.log("- Customer info exists:", !!customerInfo)
+    console.log("- Installation data length:", installationData.length)
     return <NoDataState onBack={handleBack} />
   }
 
+  console.log("Rendering report view with data")
   return (
     <ReportView
       customerInfo={customerInfo}
