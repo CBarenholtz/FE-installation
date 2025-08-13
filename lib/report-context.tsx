@@ -2,7 +2,6 @@
 
 import type React from "react"
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
-import { safeJsonParse } from "@/lib/utils"
 import type { CustomerInfo, Note } from "@/lib/types"
 
 // Add coverImage to the ReportContextType interface
@@ -103,56 +102,56 @@ export function ReportProvider({ children }: { children: ReactNode }) {
     const storedCoverImageSize = localStorage.getItem("coverImageSize")
 
     if (storedCustomerInfo) {
-      setCustomerInfo(safeJsonParse(storedCustomerInfo, defaultCustomerInfo))
+      setCustomerInfo(JSON.parse(storedCustomerInfo))
     }
 
     if (storedToiletCount) {
-      setToiletCount(safeJsonParse(storedToiletCount, 0))
+      setToiletCount(JSON.parse(storedToiletCount))
     }
 
     if (storedNotes) {
-      setNotes(safeJsonParse(storedNotes, []))
+      setNotes(JSON.parse(storedNotes))
     }
 
     if (storedLetterText) {
-      setLetterText(safeJsonParse(storedLetterText, defaultLetterText))
+      setLetterText(JSON.parse(storedLetterText))
     } else {
       // Initialize with default text that includes the toilet count
       setLetterText(defaultLetterText)
     }
 
     if (storedReportTitle) {
-      setReportTitle(safeJsonParse(storedReportTitle, "Water Conservation Installation Report"))
+      setReportTitle(JSON.parse(storedReportTitle))
     }
 
     if (storedSignatureName) {
-      setSignatureName(safeJsonParse(storedSignatureName, "Zev Stern, CWEP"))
+      setSignatureName(JSON.parse(storedSignatureName))
     }
 
     if (storedSignatureTitle) {
-      setSignatureTitle(safeJsonParse(storedSignatureTitle, "Chief Operating Officer"))
+      setSignatureTitle(JSON.parse(storedSignatureTitle))
     }
 
     // Load new editable text elements
     if (storedRePrefix) {
-      setRePrefix(safeJsonParse(storedRePrefix, "RE:"))
+      setRePrefix(JSON.parse(storedRePrefix))
     }
 
     if (storedDearPrefix) {
-      setDearPrefix(safeJsonParse(storedDearPrefix, "Dear"))
+      setDearPrefix(JSON.parse(storedDearPrefix))
     }
 
     if (storedSectionTitles) {
-      setSectionTitles(safeJsonParse(storedSectionTitles, defaultSectionTitles))
+      setSectionTitles(JSON.parse(storedSectionTitles))
     }
 
     // Load cover image
     if (storedCoverImage) {
-      setCoverImage(safeJsonParse(storedCoverImage, null))
+      setCoverImage(JSON.parse(storedCoverImage))
     }
 
     if (storedCoverImageSize) {
-      setCoverImageSize(safeJsonParse(storedCoverImageSize, 80))
+      setCoverImageSize(JSON.parse(storedCoverImageSize))
     }
   }, [])
 

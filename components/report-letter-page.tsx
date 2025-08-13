@@ -19,7 +19,6 @@ export default function ReportLetterPage({ customerInfo, toiletCount, isEditable
     signatureTitle,
     setSignatureTitle,
     setCustomerInfo,
-    // Remove: setHasUnsavedChanges,
     // Add new editable text elements
     rePrefix,
     setRePrefix,
@@ -32,8 +31,6 @@ export default function ReportLetterPage({ customerInfo, toiletCount, isEditable
       const newLetterText = [...letterText]
       newLetterText[index] = value
       setLetterText(newLetterText)
-      // Remove this line:
-      // setHasUnsavedChanges(true)
       console.log(`Updated letter text at index ${index} to "${value}"`)
     }
   }
@@ -45,8 +42,6 @@ export default function ReportLetterPage({ customerInfo, toiletCount, isEditable
         console.log(`Updated ${field} to "${value}"`, updated)
         return updated
       })
-      // Remove this line:
-      // setHasUnsavedChanges(true)
     }
   }
 
