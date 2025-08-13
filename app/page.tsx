@@ -387,7 +387,22 @@ function ReportContent() {
       console.log("Stored toilet count exists:", !!storedToiletCount)
       console.log("Stored customer info exists:", !!storedCustomerInfo)
 
-      if (storedInstallationData && storedToiletCount) {
+      const isValidJSON = (str: string | null): boolean => {
+        if (!str || str === "undefined" || str === "null") return false
+        try {
+          JSON.parse(str)
+          return true
+        } catch {
+          return false
+        }
+      }
+
+      if (
+        storedInstallationData &&
+        storedToiletCount &&
+        isValidJSON(storedInstallationData) &&
+        isValidJSON(storedToiletCount)
+      ) {
         const parsedInstallationData = JSON.parse(storedInstallationData)
         const parsedToiletCount = JSON.parse(storedToiletCount)
 
@@ -396,6 +411,11 @@ function ReportContent() {
 
         setInstallationData(parsedInstallationData)
         setToiletCount(parsedToiletCount)
+
+        if (storedCustomerInfo && isValidJSON(storedCustomerInfo)) {
+          const parsedCustomerInfo = JSON.parse(storedCustomerInfo)
+          setCustomerInfo(parsedCustomerInfo)
+        }
 
         // Log the schema of the CSV data
         if (parsedInstallationData && parsedInstallationData.length > 0) {
@@ -447,19 +467,37 @@ function ReportContent() {
 
         console.log("Data loading completed successfully")
       } else {
-        console.log("Missing required data in localStorage:")
-        console.log("- Installation data missing:", !storedInstallationData)
-        console.log("- Toilet count missing:", !storedToiletCount)
-        console.log("- Customer info missing:", !storedCustomerInfo)
+        console.log("Missing or invalid data in localStorage:")
+        console.log(
+          "- Installation data missing/invalid:",
+          !storedInstallationData || !isValidJSON(storedInstallationData),
+        )
+        console.log("- Toilet count missing/invalid:", !storedToiletCount || !isValidJSON(storedToiletCount))
+        console.log("- Customer info missing/invalid:", !storedCustomerInfo || !isValidJSON(storedCustomerInfo))
+
+        if (storedInstallationData && !isValidJSON(storedInstallationData)) {
+          localStorage.removeItem("installationData")
+        }
+        if (storedToiletCount && !isValidJSON(storedToiletCount)) {
+          localStorage.removeItem("toiletCount")
+        }
+        if (storedCustomerInfo && !isValidJSON(storedCustomerInfo)) {
+          localStorage.removeItem("customerInfo")
+        }
       }
     } catch (error) {
       console.error("Error loading data:", error)
       console.error("Error details:", error.message)
+
+      localStorage.removeItem("installationData")
+      localStorage.removeItem("toiletCount")
+      localStorage.removeItem("customerInfo")
+      localStorage.removeItem("reportImages")
     } finally {
       setLoading(false)
       console.log("Loading state set to false")
     }
-  }, [setToiletCount])
+  }, [setToiletCount, setCustomerInfo])
 
   // Load data on component mount
   useEffect(() => {
