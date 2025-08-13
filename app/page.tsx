@@ -20,6 +20,7 @@ import ImageUpload from "@/components/image-upload"
 import ReportPicturesPage from "@/components/report-pictures-page"
 import { ReportProvider, useReportContext } from "@/lib/report-context"
 import { parseExcelFile } from "@/lib/excel-parser"
+import { safeJsonParse } from "@/lib/utils"
 import type { CustomerInfo, InstallationData, Note, ImageData } from "@/lib/types"
 
 function UploadForm({ onDataLoaded }: { onDataLoaded: () => void }) {
@@ -314,60 +315,62 @@ function ReportContent() {
       const storedCustomerInfo = localStorage.getItem("customerInfo")
 
       if (storedInstallationData && storedToiletCount && storedCustomerInfo) {
-        const parsedInstallationData = JSON.parse(storedInstallationData)
-        const parsedToiletCount = JSON.parse(storedToiletCount)
-        const parsedCustomerInfo = JSON.parse(storedCustomerInfo)
+        const parsedInstallationData = safeJsonParse(storedInstallationData, [])
+        const parsedToiletCount = safeJsonParse(storedToiletCount, 0)
+        const parsedCustomerInfo = safeJsonParse(storedCustomerInfo, null)
 
-        setInstallationData(parsedInstallationData)
-        setToiletCount(parsedToiletCount)
-        setCustomerInfo(parsedCustomerInfo)
+        if (parsedInstallationData.length > 0 && parsedCustomerInfo) {
+          setInstallationData(parsedInstallationData)
+          setToiletCount(parsedToiletCount)
+          setCustomerInfo(parsedCustomerInfo)
 
-        // Log the schema of the CSV data
-        if (parsedInstallationData && parsedInstallationData.length > 0) {
-          const firstItem = parsedInstallationData[0]
-          const schema = Object.keys(firstItem).map((key) => ({
-            name: key,
-            type: typeof firstItem[key],
-            exampleValue: firstItem[key],
-          }))
-          setCsvSchema(schema)
+          // Log the schema of the CSV data
+          if (parsedInstallationData && parsedInstallationData.length > 0) {
+            const firstItem = parsedInstallationData[0]
+            const schema = Object.keys(firstItem).map((key) => ({
+              name: key,
+              type: typeof firstItem[key],
+              exampleValue: firstItem[key],
+            }))
+            setCsvSchema(schema)
+          }
+
+          // The data is already filtered and sorted from the CSV preview page
+          setFilteredData(parsedInstallationData)
+
+          // Group notes for the notes pages - only include leak issues and custom notes
+          const notes = parsedInstallationData
+            .filter(
+              (item: InstallationData) =>
+                item["Leak Issue Kitchen Faucet"] ||
+                item["Leak Issue Bath Faucet"] ||
+                item["Tub Spout/Diverter Leak Issue"] ||
+                (item.Notes && item.Notes.trim() !== ""),
+            )
+            .map((item: InstallationData) => {
+              let noteText = ""
+              if (item["Leak Issue Kitchen Faucet"]) noteText += "Dripping from kitchen faucet. "
+              if (item["Leak Issue Bath Faucet"]) noteText += "Dripping from bathroom faucet. "
+              if (item["Tub Spout/Diverter Leak Issue"] === "Light") noteText += "Light leak from tub spout/ diverter. "
+              if (item["Tub Spout/Diverter Leak Issue"] === "Moderate")
+                noteText += "Moderate leak from tub spout/diverter. "
+              if (item["Tub Spout/Diverter Leak Issue"] === "Heavy") noteText += "Heavy leak from tub spout/ diverter. "
+
+              // Add custom notes from CSV preview (this includes selected cells and columns)
+              if (item.Notes && item.Notes.trim() !== "") {
+                noteText += item.Notes + " "
+              }
+
+              return {
+                unit: item.Unit,
+                note: noteText.trim(),
+              }
+            })
+            .filter((note: Note) => note.note !== "") // Remove notes that are empty after filtering
+
+          console.log("Report: Generated notes from installation data:", notes)
+          setReportNotes(notes)
         }
-
-        // The data is already filtered and sorted from the CSV preview page
-        setFilteredData(parsedInstallationData)
-
-        // Group notes for the notes pages - only include leak issues and custom notes
-        const notes = parsedInstallationData
-          .filter(
-            (item: InstallationData) =>
-              item["Leak Issue Kitchen Faucet"] ||
-              item["Leak Issue Bath Faucet"] ||
-              item["Tub Spout/Diverter Leak Issue"] ||
-              (item.Notes && item.Notes.trim() !== ""),
-          )
-          .map((item: InstallationData) => {
-            let noteText = ""
-            if (item["Leak Issue Kitchen Faucet"]) noteText += "Dripping from kitchen faucet. "
-            if (item["Leak Issue Bath Faucet"]) noteText += "Dripping from bathroom faucet. "
-            if (item["Tub Spout/Diverter Leak Issue"] === "Light") noteText += "Light leak from tub spout/ diverter. "
-            if (item["Tub Spout/Diverter Leak Issue"] === "Moderate")
-              noteText += "Moderate leak from tub spout/diverter. "
-            if (item["Tub Spout/Diverter Leak Issue"] === "Heavy") noteText += "Heavy leak from tub spout/ diverter. "
-
-            // Add custom notes from CSV preview (this includes selected cells and columns)
-            if (item.Notes && item.Notes.trim() !== "") {
-              noteText += item.Notes + " "
-            }
-
-            return {
-              unit: item.Unit,
-              note: noteText.trim(),
-            }
-          })
-          .filter((note: Note) => note.note !== "") // Remove notes that are empty after filtering
-
-        console.log("Report: Generated notes from installation data:", notes)
-        setReportNotes(notes)
       }
     } catch (error) {
       console.error("Error loading data:", error)
