@@ -76,16 +76,15 @@ function UploadForm() {
         return
       }
 
-      // Count toilets
-      const toiletCount = installationData.filter((item) => {
-        const toiletColumn = Object.keys(item).find((key) => key.startsWith("Toilets Installed:"))
-        return toiletColumn && item[toiletColumn] && item[toiletColumn] !== ""
-      }).length
-
-      // Store data in localStorage
-      localStorage.setItem("installationData", JSON.stringify(installationData))
-      localStorage.setItem("toiletCount", JSON.stringify(toiletCount))
-      localStorage.setItem("customerInfo", JSON.stringify(customerInfo))
+      // Store raw data and customer info
+      localStorage.setItem("rawInstallationData", JSON.stringify(installationData))
+      localStorage.setItem(
+        "customerInfo",
+        JSON.stringify({
+          ...customerInfo,
+          date: new Date().toLocaleDateString(),
+        }),
+      )
 
       // Handle cover image if provided
       if (coverImage) {
@@ -93,13 +92,11 @@ function UploadForm() {
         reader.onload = (e) => {
           const imageData = e.target?.result as string
           localStorage.setItem("coverImage", imageData)
-          // Navigate to report view
-          window.location.reload()
+          router.push("/csv-preview")
         }
         reader.readAsDataURL(coverImage)
       } else {
-        // Navigate to report view
-        window.location.reload()
+        router.push("/csv-preview")
       }
     } catch (error) {
       console.error("Error processing file:", error)

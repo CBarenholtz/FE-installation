@@ -145,30 +145,30 @@ export default function CsvPreviewPage() {
   }
 
   // Handle cell selection for notes
-const handleCellToggle = (rowIndex: number, column: string, value: string) => {
-  const unitValue = previewData[rowIndex][selectedUnitColumn]
-  if (!unitValue) return
+  const handleCellToggle = (rowIndex: number, column: string, value: string) => {
+    const unitValue = previewData[rowIndex][selectedUnitColumn]
+    if (!unitValue) return
 
-  setSelectedCells((prev) => {
-    const unitCells = prev[unitValue] || []
-    const cellIdentifier = `${value}` // Removed column name
+    setSelectedCells((prev) => {
+      const unitCells = prev[unitValue] || []
+      const cellIdentifier = `${value}` // Removed column name
 
-    const isSelected = unitCells.includes(cellIdentifier)
+      const isSelected = unitCells.includes(cellIdentifier)
 
-    if (isSelected) {
-      // Remove cell
-      const updatedCells = unitCells.filter((cell) => cell !== cellIdentifier)
-      if (updatedCells.length === 0) {
-        const { [unitValue]: removed, ...rest } = prev
-        return rest
+      if (isSelected) {
+        // Remove cell
+        const updatedCells = unitCells.filter((cell) => cell !== cellIdentifier)
+        if (updatedCells.length === 0) {
+          const { [unitValue]: removed, ...rest } = prev
+          return rest
+        }
+        return { ...prev, [unitValue]: updatedCells }
+      } else {
+        // Add cell
+        return { ...prev, [unitValue]: [...unitCells, cellIdentifier] }
       }
-      return { ...prev, [unitValue]: updatedCells }
-    } else {
-      // Add cell
-      return { ...prev, [unitValue]: [...unitCells, cellIdentifier] }
-    }
-  })
-}
+    })
+  }
 
   // Check if a cell is selected
   const isCellSelected = (rowIndex: number, column: string, value: string): boolean => {
@@ -195,7 +195,7 @@ const handleCellToggle = (rowIndex: number, column: string, value: string) => {
     localStorage.setItem("toiletCount", JSON.stringify(processedData.toiletCount))
 
     // Navigate to report
-    router.push("/report")
+    router.push("/")
   }
 
   // Process installation data with selected configuration
