@@ -86,10 +86,23 @@ function ReportView({
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-8 print:hidden">
-        <Button variant="outline" onClick={onBack}>
-          <ChevronLeft className="mr-2 h-4 w-4" />
-          Back to Form
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={onBack} className="bg-white hover:bg-gray-50">
+            <ChevronLeft className="mr-2 h-4 w-4" />
+            Back to Form
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => {
+              console.log("Force refresh button clicked")
+              localStorage.clear()
+              window.location.href = "/"
+            }}
+            className="text-xs"
+          >
+            Force Refresh
+          </Button>
+        </div>
         <div className="flex flex-wrap gap-2">
           {ExcelExportButton ? (
             <ExcelExportButton
@@ -208,7 +221,23 @@ function ReportContent() {
   const [reportNotes, setReportNotes] = useState<Note[]>([])
 
   const handleBack = () => {
-    router.push("/")
+    console.log("Back button clicked - attempting navigation")
+    try {
+      // Clear localStorage data to ensure fresh start
+      localStorage.removeItem("installationData")
+      localStorage.removeItem("toiletCount")
+      localStorage.removeItem("customerInfo")
+      localStorage.removeItem("reportImages")
+      console.log("Cleared localStorage data")
+
+      // Navigate back to home
+      router.push("/")
+      console.log("Navigation initiated")
+    } catch (error) {
+      console.error("Error in handleBack:", error)
+      // Fallback: reload the page to root
+      window.location.href = "/"
+    }
   }
 
   // Load data from localStorage

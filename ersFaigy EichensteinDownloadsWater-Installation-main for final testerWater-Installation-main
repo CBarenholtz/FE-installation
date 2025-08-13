@@ -1,0 +1,5 @@
+[33m23e4cd4[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mfix-quantity-formatting[m[33m, [m[1;31morigin/fix-quantity-formatting[m[33m)[m Add debugging and error handling to identify missing components
+[33md81c481[m Add jszip dependency using pnpm
+[33mc4db0bc[m Add jszip dependency for image upload functionality
+[33me056245[m Add flexible quantity logic to handle both direct Excel values and consolidated row counts
+[33m8cde35b[m Add comprehensive pictures functionality with image upload, processing, and report integration
