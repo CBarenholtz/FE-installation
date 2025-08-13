@@ -50,12 +50,14 @@ function ReportView({
   toiletCount,
   notes,
   onBack,
+  handleClearAllData,
 }: {
   customerInfo: CustomerInfo
   installationData: InstallationData[]
   toiletCount: number
   notes: Note[]
   onBack: () => void
+  handleClearAllData: () => void
 }) {
   const [currentPage, setCurrentPage] = useState("cover")
   const [images, setImages] = useState<ImageData[]>([])
@@ -91,16 +93,8 @@ function ReportView({
             <ChevronLeft className="mr-2 h-4 w-4" />
             Back to Form
           </Button>
-          <Button
-            variant="destructive"
-            onClick={() => {
-              console.log("Force refresh button clicked")
-              localStorage.clear()
-              window.location.href = "/"
-            }}
-            className="text-xs"
-          >
-            Force Refresh
+          <Button variant="destructive" onClick={handleClearAllData} className="text-xs">
+            Clear All Data
           </Button>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -223,18 +217,32 @@ function ReportContent() {
   const handleBack = () => {
     console.log("Back button clicked - attempting navigation")
     try {
+      // Only clear data if user explicitly wants to start fresh
+      router.push("/")
+      console.log("Navigation initiated")
+    } catch (error) {
+      console.error("Error in handleBack:", error)
+      // Fallback: reload the page to root
+      window.location.href = "/"
+    }
+  }
+
+  const handleClearAllData = () => {
+    console.log("Clear all data button clicked")
+    try {
       // Clear localStorage data to ensure fresh start
       localStorage.removeItem("installationData")
       localStorage.removeItem("toiletCount")
       localStorage.removeItem("customerInfo")
       localStorage.removeItem("reportImages")
-      console.log("Cleared localStorage data")
+      localStorage.removeItem("reportNotes")
+      console.log("Cleared all localStorage data")
 
       // Navigate back to home
       router.push("/")
-      console.log("Navigation initiated")
+      console.log("Navigation initiated after clearing data")
     } catch (error) {
-      console.error("Error in handleBack:", error)
+      console.error("Error in handleClearAllData:", error)
       // Fallback: reload the page to root
       window.location.href = "/"
     }
@@ -335,6 +343,7 @@ function ReportContent() {
       toiletCount={toiletCount}
       notes={notes}
       onBack={handleBack}
+      handleClearAllData={handleClearAllData}
     />
   )
 }
