@@ -367,6 +367,22 @@ function ReportContent() {
   const [reportNotes, setReportNotes] = useState<Note[]>([])
 
   const handleBack = () => {
+    localStorage.removeItem("installationData")
+    localStorage.removeItem("toiletCount")
+    localStorage.removeItem("customerInfo")
+    localStorage.removeItem("rawInstallationData")
+    localStorage.removeItem("coverImage")
+    localStorage.removeItem("reportImages")
+    localStorage.removeItem("selectedCells")
+    localStorage.removeItem("selectedNotesColumns")
+
+    // Reset component state
+    setInstallationData([])
+    setFilteredData([])
+    setReportNotes([])
+    setLoading(true)
+
+    // Trigger a reload of the data which will now show the upload form
     router.push("/")
   }
 
