@@ -393,47 +393,37 @@ export function setCaptionsFromUnitNotes(
   console.log("- Installation data:", installationData.length)
   console.log("- Notes:", notes.length)
 
-  if (installationData.length > 0) {
-    console.log("Sample installation data structure:")
-    console.log("Keys:", Object.keys(installationData[0]))
-    console.log("Full sample:", installationData[0])
+  if (installationData.length === 0) {
+    return images
   }
 
-  let tubLeakColumn = ""
-  let kitchSinkColumn = ""
-  let bathSinkColumn = ""
+  // Find the three leak columns
+  const sampleData = installationData[0]
+  const columns = Object.keys(sampleData)
 
-  if (installationData.length > 0) {
-    const sampleData = installationData[0]
-    const columns = Object.keys(sampleData)
+  const tubLeakColumn =
+    columns.find(
+      (col) =>
+        col.toLowerCase().includes("tub") &&
+        col.toLowerCase().includes("leak") &&
+        col.toLowerCase().includes("description"),
+    ) || ""
 
-    // Find Tub Leak Description column
-    tubLeakColumn =
-      columns.find(
-        (col) =>
-          col.toLowerCase().includes("tub") &&
-          col.toLowerCase().includes("leak") &&
-          col.toLowerCase().includes("description"),
-      ) || ""
+  const kitchSinkColumn =
+    columns.find((col) => col.toLowerCase().includes("kitch") && col.toLowerCase().includes("sink")) || ""
 
-    // Find Kitchen Sink column
-    kitchSinkColumn =
-      columns.find((col) => col.toLowerCase().includes("kitch") && col.toLowerCase().includes("sink")) || ""
+  const bathSinkColumn =
+    columns.find(
+      (col) =>
+        col.toLowerCase().includes("bath") &&
+        col.toLowerCase().includes("sink") &&
+        !col.toLowerCase().includes("kitch"),
+    ) || ""
 
-    // Find Bath Sink column
-    bathSinkColumn =
-      columns.find(
-        (col) =>
-          col.toLowerCase().includes("bath") &&
-          col.toLowerCase().includes("sink") &&
-          !col.toLowerCase().includes("kitch"),
-      ) || ""
-
-    console.log("Found leak columns:")
-    console.log("- Tub Leak:", tubLeakColumn)
-    console.log("- Kitchen Sink:", kitchSinkColumn)
-    console.log("- Bath Sink:", bathSinkColumn)
-  }
+  console.log("Found leak columns:")
+  console.log("- Tub Leak:", tubLeakColumn)
+  console.log("- Kitchen Sink:", kitchSinkColumn)
+  console.log("- Bath Sink:", bathSinkColumn)
 
   return images.map((image) => {
     console.log(`🔥 Processing image: ${image.filename} for unit ${image.unit}`)
@@ -442,53 +432,27 @@ export function setCaptionsFromUnitNotes(
     const unitData = installationData.find((data) => data.Unit === image.unit)
 
     if (!unitData) {
-      console.log(`Unit ${image.unit} - No unit data found`)
+      console.log(`🔥 Unit ${image.unit} - No unit data found`)
       return {
         ...image,
         caption: image.caption || `Unit ${image.unit} installation photo`,
       }
     }
 
-    const filename = image.filename.toLowerCase()
     let caption = ""
 
-    // Check filename for specific leak type keywords
-    const isTubImage = filename.includes("tub") || filename.includes("shower") || filename.includes("spout")
-    const isKitchenImage = filename.includes("kitchen") || filename.includes("kitch")
-    const isBathImage = (filename.includes("bath") || filename.includes("bathroom")) && !filename.includes("kitchen")
-
-    console.log(`🔥 Image analysis for ${image.filename}:`)
-    console.log(`- Is tub image: ${isTubImage}`)
-    console.log(`- Is kitchen image: ${isKitchenImage}`)
-    console.log(`- Is bath image: ${isBathImage}`)
-
-    // Intelligent caption assignment based on image content
-    if (isTubImage && tubLeakColumn && unitData[tubLeakColumn] && unitData[tubLeakColumn].trim()) {
+    if (tubLeakColumn && unitData[tubLeakColumn] && unitData[tubLeakColumn].trim()) {
       const severity = unitData[tubLeakColumn].trim()
       caption = `${severity} leak from tub spout.`
       console.log(`🔥 Assigned tub caption: "${caption}"`)
-    } else if (isKitchenImage && kitchSinkColumn && unitData[kitchSinkColumn] && unitData[kitchSinkColumn].trim()) {
-      const severity = unitData[kitchSinkColumn].trim()
-      caption = `${severity} drip from kitchen faucet.`
-      console.log(`🔥 Assigned kitchen caption: "${caption}"`)
-    } else if (isBathImage && bathSinkColumn && unitData[bathSinkColumn] && unitData[bathSinkColumn].trim()) {
-      const severity = unitData[bathSinkColumn].trim()
-      caption = `${severity} drip from bathroom faucet.`
-      console.log(`🔥 Assigned bathroom caption: "${caption}"`)
-    }
-    // Fallback to priority system if filename doesn't indicate specific type
-    else if (tubLeakColumn && unitData[tubLeakColumn] && unitData[tubLeakColumn].trim()) {
-      const severity = unitData[tubLeakColumn].trim()
-      caption = `${severity} leak from tub spout.`
-      console.log(`🔥 Fallback to tub caption: "${caption}"`)
     } else if (kitchSinkColumn && unitData[kitchSinkColumn] && unitData[kitchSinkColumn].trim()) {
       const severity = unitData[kitchSinkColumn].trim()
       caption = `${severity} drip from kitchen faucet.`
-      console.log(`🔥 Fallback to kitchen caption: "${caption}"`)
+      console.log(`🔥 Assigned kitchen caption: "${caption}"`)
     } else if (bathSinkColumn && unitData[bathSinkColumn] && unitData[bathSinkColumn].trim()) {
       const severity = unitData[bathSinkColumn].trim()
       caption = `${severity} drip from bathroom faucet.`
-      console.log(`🔥 Fallback to bathroom caption: "${caption}"`)
+      console.log(`🔥 Assigned bathroom caption: "${caption}"`)
     } else {
       caption = image.caption || `Unit ${image.unit} installation photo`
       console.log(`🔥 Using fallback caption: "${caption}"`)
@@ -737,4 +701,108 @@ function setCaptionFromFallback(
     ...image,
     caption: image.caption || `Unit ${image.unit} installation photo`,
   }
+}
+
+export function setCaptionsFromManualSelection(images: ImageData[], installationData: InstallationData[]): ImageData[] {
+  console.log("🔧 setCaptionsFromManualSelection called with:")
+  console.log("- Images:", images.length)
+  console.log("- Installation data:", installationData.length)
+
+  if (installationData.length === 0) {
+    console.log("🔧 No installation data available")
+    return images
+  }
+
+  // Find leak columns
+  const sampleData = installationData[0]
+  const columns = Object.keys(sampleData)
+
+  const tubLeakColumn =
+    columns.find(
+      (col) =>
+        col.toLowerCase().includes("tub") &&
+        col.toLowerCase().includes("leak") &&
+        col.toLowerCase().includes("description"),
+    ) || ""
+
+  const kitchSinkColumn =
+    columns.find((col) => col.toLowerCase().includes("kitch") && col.toLowerCase().includes("sink")) || ""
+
+  const bathSinkColumn =
+    columns.find(
+      (col) =>
+        col.toLowerCase().includes("bath") &&
+        col.toLowerCase().includes("sink") &&
+        !col.toLowerCase().includes("kitch"),
+    ) || ""
+
+  console.log("🔧 Found leak columns:")
+  console.log("- Tub Leak:", tubLeakColumn)
+  console.log("- Kitchen Sink:", kitchSinkColumn)
+  console.log("- Bath Sink:", bathSinkColumn)
+
+  return images.map((image) => {
+    const imageWithFixture = image as any // Type assertion for fixtureType
+    console.log(`🔧 Processing image: ${image.filename} for unit ${image.unit}`)
+    console.log(`🔧 Selected fixture type: ${imageWithFixture.fixtureType || "none"}`)
+
+    // Find the unit's data
+    const unitData = installationData.find((data) => data.Unit === image.unit)
+
+    if (!unitData) {
+      console.log(`🔧 Unit ${image.unit} - No unit data found`)
+      return {
+        ...image,
+        caption: image.caption || `Unit ${image.unit} installation photo`,
+      }
+    }
+
+    let caption = ""
+
+    // Generate caption based on manually selected fixture type
+    switch (imageWithFixture.fixtureType) {
+      case "tub":
+        if (tubLeakColumn && unitData[tubLeakColumn] && unitData[tubLeakColumn].trim()) {
+          const severity = unitData[tubLeakColumn].trim()
+          caption = `${severity} leak from tub spout.`
+          console.log(`🔧 Generated tub caption: "${caption}"`)
+        } else {
+          console.log(`🔧 No tub leak data available for unit ${image.unit}`)
+        }
+        break
+      case "kitchen_sink":
+        if (kitchSinkColumn && unitData[kitchSinkColumn] && unitData[kitchSinkColumn].trim()) {
+          const severity = unitData[kitchSinkColumn].trim()
+          caption = `${severity} drip from kitchen faucet.`
+          console.log(`🔧 Generated kitchen caption: "${caption}"`)
+        } else {
+          console.log(`🔧 No kitchen sink data available for unit ${image.unit}`)
+        }
+        break
+      case "bathroom_sink":
+        if (bathSinkColumn && unitData[bathSinkColumn] && unitData[bathSinkColumn].trim()) {
+          const severity = unitData[bathSinkColumn].trim()
+          caption = `${severity} drip from bathroom faucet.`
+          console.log(`🔧 Generated bathroom caption: "${caption}"`)
+        } else {
+          console.log(`🔧 No bathroom sink data available for unit ${image.unit}`)
+        }
+        break
+      default:
+        console.log(`🔧 No fixture type selected, keeping existing caption`)
+        caption = image.caption || `Unit ${image.unit} installation photo`
+    }
+
+    if (!caption) {
+      caption = image.caption || `Unit ${image.unit} installation photo`
+      console.log(`🔧 Using fallback caption: "${caption}"`)
+    }
+
+    console.log(`🔧 Final caption for ${image.filename}: "${caption}"`)
+
+    return {
+      ...image,
+      caption: caption,
+    }
+  })
 }

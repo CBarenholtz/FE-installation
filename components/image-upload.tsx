@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Upload, Link, X, ImageIcon, Wand2 } from "lucide-react"
 import type { ImageData, InstallationData, Note } from "@/lib/types"
-import { extractUnitFromFilename, setCaptionsFromAIAnalysis } from "@/lib/utils/image-processor"
+import { extractUnitFromFilename, setCaptionsFromUnitNotes } from "@/lib/utils/image-processor"
 import JSZip from "jszip"
 
 interface ImageUploadProps {
@@ -119,13 +119,13 @@ export default function ImageUpload({
   }
 
   const handleAutoSuggestCaptions = async () => {
-    console.log("🤖 Auto-suggest captions with AI analysis clicked")
+    console.log("🔥 Auto-suggest captions clicked")
     console.log("Images:", images.length)
     console.log("Installation data:", installationData.length)
     console.log("Notes:", notes.length)
 
     if (images.length === 0) {
-      alert("No images to analyze")
+      alert("No images to process")
       return
     }
 
@@ -134,23 +134,16 @@ export default function ImageUpload({
       return
     }
 
-    if (!process.env.GROQ_API_KEY) {
-      alert("AI analysis requires Groq API configuration. Please check your environment settings.")
-      return
-    }
-
     setIsProcessing(true)
 
     try {
-      // Use AI-powered caption analysis with direct API calls
-      console.log("🤖 Starting AI-powered caption analysis...")
-      const captionedImages = await setCaptionsFromAIAnalysis(images, installationData, notes)
+      const captionedImages = setCaptionsFromUnitNotes(images, installationData, notes)
 
-      console.log("🤖 AI caption analysis complete!")
+      console.log("🔥 Caption generation complete!")
 
       // Log changes made
       const changedImages = captionedImages.filter((img, index) => img.caption !== images[index].caption)
-      console.log("Images with AI-generated captions:", changedImages.length)
+      console.log("Images with generated captions:", changedImages.length)
       changedImages.forEach((img) => {
         console.log(`Unit ${img.unit}: "${img.caption}"`)
       })
@@ -159,13 +152,13 @@ export default function ImageUpload({
       onImagesUploaded(captionedImages)
 
       if (changedImages.length > 0) {
-        alert(`AI analysis complete! Generated captions for ${changedImages.length} images.`)
+        alert(`Caption generation complete! Generated captions for ${changedImages.length} images.`)
       } else {
-        alert("AI analysis complete! No new captions were generated.")
+        alert("Caption generation complete! No new captions were generated.")
       }
     } catch (error) {
-      console.error("🤖 Error in AI caption analysis:", error)
-      alert("Error analyzing images with AI. Please try again.")
+      console.error("🔥 Error in caption generation:", error)
+      alert("Error generating captions. Please try again.")
     } finally {
       setIsProcessing(false)
     }
@@ -239,7 +232,7 @@ export default function ImageUpload({
           </TabsContent>
         </Tabs>
 
-        {/* Display uploaded images with editing capabilities and auto-suggest */}
+        {/* Display uploaded images with editing capabilities */}
         {images.length > 0 && (
           <div className="mt-6 space-y-4">
             <div className="flex items-center justify-between">
@@ -247,10 +240,11 @@ export default function ImageUpload({
               {installationData.length > 0 && (
                 <Button variant="outline" size="sm" onClick={handleAutoSuggestCaptions} disabled={isProcessing}>
                   <Wand2 className="h-4 w-4 mr-2" />
-                  {isProcessing ? "Analyzing..." : "AI Auto-Suggest Captions"}
+                  {isProcessing ? "Generating..." : "Auto-Suggest Captions"}
                 </Button>
               )}
             </div>
+
             <div className="grid gap-4">
               {images.map((image) => (
                 <Card key={image.id} className="p-4">
