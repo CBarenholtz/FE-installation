@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Upload, Link, X, ImageIcon, Wand2 } from "lucide-react"
 import type { ImageData, InstallationData, Note } from "@/lib/types"
-import { extractUnitFromFilename, setCaptionsFromUnitNotes } from "@/lib/utils/image-processor"
+import { extractUnitFromFilename, setCaptionsFromAIAnalysis } from "@/lib/utils/image-processor"
 import JSZip from "jszip"
 
 interface ImageUploadProps {
@@ -118,35 +118,52 @@ export default function ImageUpload({
     setGoogleDriveLinks("")
   }
 
-  const handleAutoSuggestCaptions = () => {
-    console.log("Auto-suggest captions clicked")
+  const handleAutoSuggestCaptions = async () => {
+    console.log("🤖 Auto-suggest captions with AI analysis clicked")
     console.log("Images:", images.length)
     console.log("Installation data:", installationData.length)
     console.log("Notes:", notes.length)
 
-    // Log sample data to understand structure
-    if (images.length > 0) {
-      console.log("Sample image:", images[0])
-    }
-    if (installationData.length > 0) {
-      console.log("Sample installation data:", installationData[0])
-    }
-    if (notes.length > 0) {
-      console.log("Sample note:", notes[0])
+    if (images.length === 0) {
+      alert("No images to analyze")
+      return
     }
 
-    const captionedImages = setCaptionsFromUnitNotes(images, installationData, notes)
-    console.log("Captioned images result:", captionedImages.length)
+    if (installationData.length === 0) {
+      alert("No installation data available for caption generation")
+      return
+    }
 
-    // Log changes made
-    const changedImages = captionedImages.filter((img, index) => img.caption !== images[index].caption)
-    console.log("Images with changed captions:", changedImages.length)
-    changedImages.forEach((img) => {
-      console.log(`Unit ${img.unit}: "${img.caption}"`)
-    })
+    setIsProcessing(true)
 
-    setImages(captionedImages)
-    onImagesUploaded(captionedImages)
+    try {
+      // Use AI-powered caption analysis
+      console.log("🤖 Starting AI-powered caption analysis...")
+      const captionedImages = await setCaptionsFromAIAnalysis(images, installationData, notes)
+
+      console.log("🤖 AI caption analysis complete!")
+
+      // Log changes made
+      const changedImages = captionedImages.filter((img, index) => img.caption !== images[index].caption)
+      console.log("Images with AI-generated captions:", changedImages.length)
+      changedImages.forEach((img) => {
+        console.log(`Unit ${img.unit}: "${img.caption}"`)
+      })
+
+      setImages(captionedImages)
+      onImagesUploaded(captionedImages)
+
+      if (changedImages.length > 0) {
+        alert(`AI analysis complete! Generated captions for ${changedImages.length} images.`)
+      } else {
+        alert("AI analysis complete! No new captions were generated.")
+      }
+    } catch (error) {
+      console.error("🤖 Error in AI caption analysis:", error)
+      alert("Error analyzing images with AI. Please try again.")
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
   const updateImage = (id: string, updates: Partial<ImageData>) => {
@@ -223,9 +240,9 @@ export default function ImageUpload({
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold">Uploaded Images ({images.length})</h3>
               {installationData.length > 0 && (
-                <Button variant="outline" size="sm" onClick={handleAutoSuggestCaptions}>
+                <Button variant="outline" size="sm" onClick={handleAutoSuggestCaptions} disabled={isProcessing}>
                   <Wand2 className="h-4 w-4 mr-2" />
-                  Auto-Suggest Captions
+                  {isProcessing ? "Analyzing..." : "AI Auto-Suggest Captions"}
                 </Button>
               )}
             </div>
