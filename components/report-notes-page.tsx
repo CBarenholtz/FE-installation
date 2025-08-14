@@ -439,7 +439,15 @@ export default function ReportNotesPage({ notes, isPreview = true, isEditable = 
 
   // Add function to add a new note
   const handleAddNote = () => {
+    console.log("🔥 Add Note button clicked!")
+    console.log("🔥 isEditable:", isEditable)
+    console.log("🔥 Current editedNotes length:", editedNotes.length)
+
+    alert("Add Note button was clicked! Check console for details.")
+
     if (isEditable) {
+      console.log("🔥 isEditable is true, proceeding with note addition")
+
       const newNote: Note = {
         unit: "",
         note: "",
@@ -447,17 +455,28 @@ export default function ReportNotesPage({ notes, isPreview = true, isEditable = 
 
       // Add to the beginning of the array so it appears at the top
       const updatedNotes = [newNote, ...editedNotes]
-      console.log("Adding new note, before:", editedNotes.length, "after:", updatedNotes.length)
+      console.log("🔥 Adding new note, before:", editedNotes.length, "after:", updatedNotes.length)
+      console.log("🔥 New note object:", newNote)
+      console.log("🔥 Updated notes array:", updatedNotes)
 
-      setEditedNotes(updatedNotes)
-      setNotes(updatedNotes)
-      localStorage.setItem("reportNotes", JSON.stringify(updatedNotes))
-      console.log("Added new note:", newNote)
-      console.log("Updated notes array:", updatedNotes)
+      try {
+        setEditedNotes(updatedNotes)
+        console.log("🔥 setEditedNotes called successfully")
 
-      // Also add the unit to the details section if it has a note
-      // This will be handled when the user actually enters a unit number and note
-      // The details section will automatically pick up the note through the unified notes system
+        setNotes(updatedNotes)
+        console.log("🔥 setNotes called successfully")
+
+        localStorage.setItem("reportNotes", JSON.stringify(updatedNotes))
+        console.log("🔥 localStorage updated successfully")
+
+        console.log("🔥 Add note operation completed successfully!")
+      } catch (error) {
+        console.error("🔥 Error during add note operation:", error)
+        alert("Error adding note: " + error.message)
+      }
+    } else {
+      console.log("🔥 isEditable is false, cannot add note")
+      alert("Cannot add note: isEditable is false")
     }
   }
 
