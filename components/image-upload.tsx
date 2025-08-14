@@ -31,6 +31,15 @@ export default function ImageUpload({
   const [isProcessing, setIsProcessing] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const convertToDataURL = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+  }
+
   // Handle zip file upload and extract images with improved unit detection
   const handleZipUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -49,7 +58,8 @@ export default function ImageUpload({
         if (!zipEntry.dir && /\.(jpg|jpeg|png|gif|webp)$/i.test(filename)) {
           const imageBlob = await zipEntry.async("blob")
           const imageFile = new File([imageBlob], filename, { type: imageBlob.type })
-          const imageUrl = URL.createObjectURL(imageFile)
+
+          const imageUrl = await convertToDataURL(imageFile)
 
           // Use improved unit extraction
           const unit = extractUnitFromFilename(filename)
@@ -57,7 +67,7 @@ export default function ImageUpload({
           newImages.push({
             id: `zip_${Date.now()}_${Math.random()}`,
             file: imageFile,
-            url: imageUrl,
+            url: imageUrl, // Now using data URL instead of blob URL
             caption: "",
             unit: unit,
             filename: filename,
