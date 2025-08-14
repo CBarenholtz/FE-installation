@@ -723,7 +723,7 @@ export default function EnhancedPdfButton({
       const estimatedDetailPages = Math.ceil(filteredData.length / estimatedRowsPerPage)
       totalPages += estimatedDetailPages
 
-      const imagesPerPage = 4 // 2x2 grid
+      const imagesPerPage = 6 // 2x3 grid for portrait orientation
       const picturesPages = picturesData.length > 0 ? Math.ceil(picturesData.length / imagesPerPage) : 0
       totalPages += picturesPages
       console.log("PDF: Adding", picturesPages, "pictures pages to total")
@@ -1426,6 +1426,7 @@ export default function EnhancedPdfButton({
         )
 
         // Split into pages
+        const imagesPerPage = 6 // 2x3 grid for portrait orientation
         for (let i = 0; i < loadedImages.length; i += imagesPerPage) {
           const pageImages = loadedImages.slice(i, i + imagesPerPage)
 
@@ -1441,18 +1442,17 @@ export default function EnhancedPdfButton({
             yPos = contentStartY + 5
           }
 
-          // Add images in 2x2 grid
-          const maxImageWidth = 85 // Maximum width for each image
-          const maxImageHeight = 60 // Maximum height for each image
-          const spacing = 10 // Spacing between images
+          const maxImageWidth = 80 // Increased width for 2 columns
+          const maxImageHeight = 50 // Height for better fit
+          const imageSpacing = 10 // Increased space between images
 
           for (let j = 0; j < pageImages.length; j++) {
             const { image, dataUrl } = pageImages[j]
-            const row = Math.floor(j / 2)
-            const col = j % 2
 
-            const baseImgX = 15 + col * (maxImageWidth + spacing)
-            const baseImgY = yPos + row * (maxImageHeight + 25) // 25mm for image + caption space
+            const col = j % 2 // 2 columns instead of 3
+            const row = Math.floor(j / 2) // Calculate row based on 2 columns
+            const x = 20 + col * (maxImageWidth + imageSpacing)
+            const y = yPos + row * (maxImageHeight + 15) // 15mm spacing between rows
 
             try {
               if (dataUrl) {
@@ -1493,24 +1493,24 @@ export default function EnhancedPdfButton({
                 }
 
                 // Center the image within the allocated space
-                const imgX = baseImgX + (maxImageWidth - imgWidth) / 2
-                const imgY = baseImgY + (maxImageHeight - imgHeight) / 2
+                const imgX = x + (maxImageWidth - imgWidth) / 2
+                const imgY = y + (maxImageHeight - imgHeight) / 2
 
                 doc.addImage(dataUrl, "JPEG", imgX, imgY, imgWidth, imgHeight)
               } else if (image.googleDriveId) {
                 // Create a placeholder for Google Drive images in PDF
                 doc.setFillColor(240, 240, 240)
-                doc.rect(baseImgX, baseImgY, maxImageWidth, maxImageHeight, "F")
+                doc.rect(x, y, maxImageWidth, maxImageHeight, "F")
                 doc.setFontSize(10)
-                doc.text("Google Drive Image", baseImgX + maxImageWidth / 2, baseImgY + maxImageHeight / 2, {
+                doc.text("Google Drive Image", x + maxImageWidth / 2, y + maxImageHeight / 2, {
                   align: "center",
                 })
               } else {
                 // Add placeholder if image fails
                 doc.setFillColor(240, 240, 240)
-                doc.rect(baseImgX, baseImgY, maxImageWidth, maxImageHeight, "F")
+                doc.rect(x, y, maxImageWidth, maxImageHeight, "F")
                 doc.setFontSize(10)
-                doc.text("Image Error", baseImgX + maxImageWidth / 2, baseImgY + maxImageHeight / 2, {
+                doc.text("Image Error", x + maxImageWidth / 2, y + maxImageHeight / 2, {
                   align: "center",
                 })
               }
@@ -1518,20 +1518,20 @@ export default function EnhancedPdfButton({
               // Add caption below image
               doc.setFontSize(9)
               doc.setFont("helvetica", "bold")
-              doc.text(`Unit ${image.unit}`, baseImgX, baseImgY + maxImageHeight + 5)
+              doc.text(`Unit ${image.unit}`, x, y + maxImageHeight + 5)
               doc.setFont("helvetica", "normal")
               doc.setFontSize(8)
               const captionLines = doc.splitTextToSize(image.caption || image.filename, maxImageWidth)
               captionLines.forEach((line: string, lineIndex: number) => {
-                doc.text(line, baseImgX, baseImgY + maxImageHeight + 10 + lineIndex * 3)
+                doc.text(line, x, y + maxImageHeight + 10 + lineIndex * 3)
               })
             } catch (error) {
               console.error("Error processing image for PDF:", error)
               // Add placeholder rectangle
               doc.setFillColor(240, 240, 240)
-              doc.rect(baseImgX, baseImgY, maxImageWidth, maxImageHeight, "F")
+              doc.rect(x, y, maxImageWidth, maxImageHeight, "F")
               doc.setFontSize(10)
-              doc.text("Image Unavailable", baseImgX + maxImageWidth / 2, baseImgY + maxImageHeight / 2, {
+              doc.text("Image Unavailable", x + maxImageWidth / 2, y + maxImageHeight / 2, {
                 align: "center",
               })
             }

@@ -107,8 +107,8 @@ export default function ReportPicturesPage({ isPreview = true, isEditable = true
     return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
   })
 
-  // Split images into pages (4 images per page for good layout)
-  const imagesPerPage = 4
+  // Split images into pages (6 images per page for good layout)
+  const imagesPerPage = 6
   const allImages = sortedUnits.flatMap((unit) => processedImages[unit])
   const imagePages = []
 
@@ -197,7 +197,7 @@ export default function ReportPicturesPage({ isPreview = true, isEditable = true
           {sortedUnits.map((unit) => (
             <div key={unit} className="space-y-4">
               <h3 className="text-lg font-semibold border-b pb-2">Unit {unit}</h3>
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-3 gap-6">
                 {processedImages[unit].map((image) => (
                   <div key={image.id} className="space-y-2">
                     <div className="relative">
@@ -282,14 +282,14 @@ export default function ReportPicturesPage({ isPreview = true, isEditable = true
           <div className="mb-16">
             {pageIndex === 0 && <h2 className="text-xl font-bold mb-6">{picturesTitle}</h2>}
 
-            {/* Images in 2x2 grid */}
-            <div className="grid grid-cols-2 gap-6">
+            {/* Images in 2x3 grid */}
+            <div className="grid grid-cols-2 gap-4">
               {pageImages.map((image) => (
                 <div key={image.id} className="space-y-2">
                   <img
                     src={image.url || "/placeholder.svg"}
                     alt={image.caption || image.filename}
-                    className="w-full h-48 object-cover rounded border"
+                    className="w-full h-40 object-cover rounded border"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement
                       target.src = "/placeholder.svg?key=error"
