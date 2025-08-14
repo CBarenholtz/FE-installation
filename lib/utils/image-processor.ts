@@ -399,123 +399,83 @@ export function setCaptionsFromUnitNotes(
     console.log("Full sample:", installationData[0])
   }
 
-  if (notes.length > 0) {
-    console.log("Sample note structure:")
-    console.log("Keys:", Object.keys(notes[0]))
-    console.log("Full sample:", notes[0])
-  }
+  let tubLeakColumn = ""
+  let kitchSinkColumn = ""
+  let bathSinkColumn = ""
 
-  if (images.length > 0) {
-    console.log("Sample image structure:")
-    console.log("Keys:", Object.keys(images[0]))
-    console.log("Sample image unit:", images[0].unit)
+  if (installationData.length > 0) {
+    const sampleData = installationData[0]
+    const columns = Object.keys(sampleData)
+
+    // Find Tub Leak Description column
+    tubLeakColumn =
+      columns.find(
+        (col) =>
+          col.toLowerCase().includes("tub") &&
+          col.toLowerCase().includes("leak") &&
+          col.toLowerCase().includes("description"),
+      ) || ""
+
+    // Find Kitchen Sink column
+    kitchSinkColumn =
+      columns.find((col) => col.toLowerCase().includes("kitch") && col.toLowerCase().includes("sink")) || ""
+
+    // Find Bath Sink column
+    bathSinkColumn =
+      columns.find(
+        (col) =>
+          col.toLowerCase().includes("bath") &&
+          col.toLowerCase().includes("sink") &&
+          !col.toLowerCase().includes("kitch"),
+      ) || ""
+
+    console.log("Found leak columns:")
+    console.log("- Tub Leak:", tubLeakColumn)
+    console.log("- Kitchen Sink:", kitchSinkColumn)
+    console.log("- Bath Sink:", bathSinkColumn)
   }
 
   return images.map((image) => {
     console.log(`Processing image for unit ${image.unit}`)
 
-    // Find the unit's notes
+    // Find the unit's data
     const unitData = installationData.find((data) => data.Unit === image.unit)
-    const unitNotes = notes.filter((note) => note.unit === image.unit)
 
     console.log(`Unit ${image.unit} - Found unit data:`, !!unitData)
-    console.log(`Unit ${image.unit} - Found unit notes:`, unitNotes.length)
 
     if (!unitData) {
       console.log(
         `Unit ${image.unit} - Available units in installation data:`,
         installationData.map((d) => d.Unit).slice(0, 10),
       )
+      return {
+        ...image,
+        caption: image.caption || `Unit ${image.unit} installation photo`,
+      }
     }
 
     let caption = ""
 
-    // Priority 1: Use unit notes from the notes array
-    if (unitNotes.length > 0) {
-      caption = unitNotes[0].note // Use the first note for this unit
-      console.log(`Unit ${image.unit} - Using unit note: "${caption}"`)
+    // Priority 1: Tub Leak Description
+    if (tubLeakColumn && unitData[tubLeakColumn] && unitData[tubLeakColumn].trim()) {
+      const severity = unitData[tubLeakColumn].trim()
+      caption = `${severity} leak from tub spout.`
+      console.log(`Unit ${image.unit} - Using tub leak: "${caption}"`)
     }
-    // Priority 2: Use general notes from installation data
-    else if (unitData?.Notes && unitData.Notes.trim()) {
-      caption = unitData.Notes.trim()
-      console.log(`Unit ${image.unit} - Using general notes: "${caption}"`)
+    // Priority 2: Kitchen Sink
+    else if (kitchSinkColumn && unitData[kitchSinkColumn] && unitData[kitchSinkColumn].trim()) {
+      const severity = unitData[kitchSinkColumn].trim()
+      caption = `${severity} drip from kitchen faucet.`
+      console.log(`Unit ${image.unit} - Using kitchen sink: "${caption}"`)
     }
-    // Priority 3: Use leak issue notes
-    else if (unitData) {
-      console.log(`Unit ${image.unit} - Available properties:`, Object.keys(unitData))
-
-      const leakNotes = []
-
-      if (unitData["Leak Issue Kitchen Faucet"]) {
-        const severity = unitData["Leak Issue Kitchen Faucet"].trim().toLowerCase()
-        switch (severity) {
-          case "light":
-            leakNotes.push("Light leak from kitchen faucet")
-            break
-          case "moderate":
-            leakNotes.push("Moderate leak from kitchen faucet")
-            break
-          case "heavy":
-            leakNotes.push("Heavy leak from kitchen faucet")
-            break
-          case "dripping":
-          case "driping":
-            leakNotes.push("Dripping from kitchen faucet")
-            break
-          default:
-            if (severity) leakNotes.push("Leak from kitchen faucet")
-            break
-        }
-      }
-
-      if (unitData["Leak Issue Bath Faucet"]) {
-        const severity = unitData["Leak Issue Bath Faucet"].trim().toLowerCase()
-        switch (severity) {
-          case "light":
-            leakNotes.push("Light leak from bathroom faucet")
-            break
-          case "moderate":
-            leakNotes.push("Moderate leak from bathroom faucet")
-            break
-          case "heavy":
-            leakNotes.push("Heavy leak from bathroom faucet")
-            break
-          case "dripping":
-          case "driping":
-            leakNotes.push("Dripping from bathroom faucet")
-            break
-          default:
-            if (severity) leakNotes.push("Leak from bathroom faucet")
-            break
-        }
-      }
-
-      if (unitData["Tub Spout/Diverter Leak Issue"]) {
-        const severity = unitData["Tub Spout/Diverter Leak Issue"]
-        switch (severity) {
-          case "Light":
-            leakNotes.push("Light leak from tub spout/diverter")
-            break
-          case "Moderate":
-            leakNotes.push("Moderate leak from tub spout/diverter")
-            break
-          case "Heavy":
-            leakNotes.push("Heavy leak from tub spout/diverter")
-            break
-          default:
-            if (severity) leakNotes.push("Leak from tub spout/diverter")
-            break
-        }
-      }
-
-      caption = leakNotes.join(". ")
-      if (caption) {
-        console.log(`Unit ${image.unit} - Using leak issue notes: "${caption}"`)
-      }
+    // Priority 3: Bath Sink
+    else if (bathSinkColumn && unitData[bathSinkColumn] && unitData[bathSinkColumn].trim()) {
+      const severity = unitData[bathSinkColumn].trim()
+      caption = `${severity} drip from bathroom faucet.`
+      console.log(`Unit ${image.unit} - Using bath sink: "${caption}"`)
     }
-
-    // Priority 4: Keep existing caption if no notes found
-    if (!caption) {
+    // Priority 4: Keep existing caption if no leak data found
+    else {
       caption = image.caption || `Unit ${image.unit} installation photo`
       console.log(`Unit ${image.unit} - Using fallback caption: "${caption}"`)
     }
