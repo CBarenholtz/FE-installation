@@ -509,7 +509,7 @@ export default function ReportDetailPage({
                 )
 
                 const kitchenAerator = kitchenAeratorColumn
-                  ? // Use consolidated count if available, otherwise use original Excel data
+                  ? // Check consolidated count first, then fall back to original Excel data
                     item._kitchenCount > 0
                     ? getAeratorDescription(item._kitchenCount.toString(), "kitchen")
                     : item[kitchenAeratorColumn] &&
@@ -519,7 +519,7 @@ export default function ReportDetailPage({
                       : "No Touch."
                   : ""
                 const bathroomAerator = bathroomAeratorColumn
-                  ? // Use consolidated count if available, otherwise use original Excel data
+                  ? // Check consolidated count first, then fall back to original Excel data
                     item._bathroomCount > 0
                     ? getAeratorDescription(item._bathroomCount.toString(), "bathroom")
                     : item[bathroomAeratorColumn] &&
@@ -704,7 +704,7 @@ export default function ReportDetailPage({
                     const unitValue = unitColumn ? item[unitColumn] : item.Unit
 
                     const kitchenAerator = kitchenAeratorColumn
-                      ? // Use consolidated count if available, otherwise use original Excel data
+                      ? // Check consolidated count first, then fall back to original Excel data
                         item._kitchenCount > 0
                         ? getAeratorDescription(item._kitchenCount.toString(), "kitchen")
                         : item[kitchenAeratorColumn] &&
@@ -714,7 +714,7 @@ export default function ReportDetailPage({
                           : "No Touch."
                       : ""
                     const bathroomAerator = bathroomAeratorColumn
-                      ? // Use consolidated count if available, otherwise use original Excel data
+                      ? // Check consolidated count first, then fall back to original Excel data
                         item._bathroomCount > 0
                         ? getAeratorDescription(item._bathroomCount.toString(), "bathroom")
                         : item[bathroomAeratorColumn] &&
