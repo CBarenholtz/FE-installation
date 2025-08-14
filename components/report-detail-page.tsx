@@ -174,7 +174,7 @@ export default function ReportDetailPage({
       result.push(item)
     }
 
-    // Group installations by unit and count quantities
+    // Group installations by unit and sum quantities
     const consolidatedData: Record<
       string,
       {
@@ -208,14 +208,14 @@ export default function ReportDetailPage({
         }
       }
 
-      // Count installations for this unit
       if (
         kitchenAeratorColumn &&
         item[kitchenAeratorColumn] &&
         item[kitchenAeratorColumn] !== "" &&
         item[kitchenAeratorColumn] !== "0"
       ) {
-        consolidatedData[unitKey].kitchenCount++
+        const quantity = Number.parseInt(item[kitchenAeratorColumn]) || 1
+        consolidatedData[unitKey].kitchenCount += quantity
       }
       if (
         bathroomAeratorColumn &&
@@ -223,13 +223,30 @@ export default function ReportDetailPage({
         item[bathroomAeratorColumn] !== "" &&
         item[bathroomAeratorColumn] !== "0"
       ) {
-        consolidatedData[unitKey].bathroomCount++
+        const quantity = Number.parseInt(item[bathroomAeratorColumn]) || 1
+        consolidatedData[unitKey].bathroomCount += quantity
       }
       if (getShowerValue(item) !== "No Touch.") {
-        consolidatedData[unitKey].showerCount++
+        // For showers, try to parse quantity from the shower columns
+        const showerColumns = findAllShowerColumns()
+        let showerQuantity = 0
+        for (const column of showerColumns) {
+          const value = item[column]
+          if (value && String(value).trim() !== "" && String(value).trim() !== "0") {
+            showerQuantity += Number.parseInt(String(value)) || 1
+          }
+        }
+        consolidatedData[unitKey].showerCount += showerQuantity || 1
       }
       if (hasToiletInstalled(item)) {
-        consolidatedData[unitKey].toiletCount++
+        // For toilets, try to parse quantity from toilet columns
+        const toiletInfo = getToiletColumnInfo(item)
+        if (toiletInfo.installed && toiletInfo.columnName) {
+          const quantity = Number.parseInt(item[toiletInfo.columnName] || "1") || 1
+          consolidatedData[unitKey].toiletCount += quantity
+        } else {
+          consolidatedData[unitKey].toiletCount += 1
+        }
       }
 
       // Collect notes
@@ -244,7 +261,7 @@ export default function ReportDetailPage({
       // Create a new item with consolidated information
       const consolidatedItem = { ...unitData.originalItem }
 
-      // Store counts in the item for later use
+      // Store summed quantities in the item for later use
       consolidatedItem._kitchenCount = unitData.kitchenCount
       consolidatedItem._bathroomCount = unitData.bathroomCount
       consolidatedItem._showerCount = unitData.showerCount
@@ -492,25 +509,36 @@ export default function ReportDetailPage({
                 )
 
                 const kitchenAerator = kitchenAeratorColumn
-                  ? item._kitchenCount > 0
-                    ? getAeratorDescription(item._kitchenCount.toString(), "kitchen")
-                    : getAeratorDescription(item[kitchenAeratorColumn] ?? "", "kitchen")
+                  ? // Check if original Excel data has quantity first, then use consolidation count as fallback
+                    item[kitchenAeratorColumn] &&
+                    item[kitchenAeratorColumn] !== "" &&
+                    item[kitchenAeratorColumn] !== "0"
+                    ? getAeratorDescription(item[kitchenAeratorColumn] ?? "", "kitchen")
+                    : item._kitchenCount > 0
+                      ? getAeratorDescription(item._kitchenCount.toString(), "kitchen")
+                      : "No Touch."
                   : ""
                 const bathroomAerator = bathroomAeratorColumn
-                  ? item._bathroomCount > 0
-                    ? getAeratorDescription(item._bathroomCount.toString(), "bathroom")
-                    : getAeratorDescription(item[bathroomAeratorColumn] ?? "", "bathroom")
+                  ? // Check if original Excel data has quantity first, then use consolidation count as fallback
+                    item[bathroomAeratorColumn] &&
+                    item[bathroomAeratorColumn] !== "" &&
+                    item[bathroomAeratorColumn] !== "0"
+                    ? getAeratorDescription(item[bathroomAeratorColumn] ?? "", "bathroom")
+                    : item._bathroomCount > 0
+                      ? getAeratorDescription(item._bathroomCount.toString(), "bathroom")
+                      : "No Touch."
                   : ""
-                const shower =
-                  item._showerCount > 0
+                const shower = (() => {
+                  const originalShowerValue = getShowerValue(item)
+                  if (originalShowerValue !== "No Touch.") {
+                    return originalShowerValue
+                  }
+                  // Use consolidation count as fallback
+                  return item._showerCount > 0
                     ? getAeratorDescription(item._showerCount.toString(), "shower")
-                    : getShowerValue(item)
-                const toilet =
-                  item._toiletCount > 0
-                    ? `We replaced ${item._toiletCount > 1 ? "both toilets" : "toilet"}.`
-                    : hasToiletInstalled(item)
-                      ? "0.8 GPF"
-                      : ""
+                    : "No Touch."
+                })()
+                const toilet = hasToiletInstalled(item) ? "0.8 GPF" : ""
 
                 const compiledNotes = item._consolidatedNotes || compileNotesForUnit(item, true)
                 const finalNote = getFinalNoteForUnit(unitValue ?? "", compiledNotes)
@@ -679,25 +707,36 @@ export default function ReportDetailPage({
                     const unitValue = unitColumn ? item[unitColumn] : item.Unit
 
                     const kitchenAerator = kitchenAeratorColumn
-                      ? item._kitchenCount > 0
-                        ? getAeratorDescription(item._kitchenCount.toString(), "kitchen")
-                        : getAeratorDescription(item[kitchenAeratorColumn] ?? "", "kitchen")
+                      ? // Check if original Excel data has quantity first, then use consolidation count as fallback
+                        item[kitchenAeratorColumn] &&
+                        item[kitchenAeratorColumn] !== "" &&
+                        item[kitchenAeratorColumn] !== "0"
+                        ? getAeratorDescription(item[kitchenAeratorColumn] ?? "", "kitchen")
+                        : item._kitchenCount > 0
+                          ? getAeratorDescription(item._kitchenCount.toString(), "kitchen")
+                          : "No Touch."
                       : ""
                     const bathroomAerator = bathroomAeratorColumn
-                      ? item._bathroomCount > 0
-                        ? getAeratorDescription(item._bathroomCount.toString(), "bathroom")
-                        : getAeratorDescription(item[bathroomAeratorColumn] ?? "", "bathroom")
+                      ? // Check if original Excel data has quantity first, then use consolidation count as fallback
+                        item[bathroomAeratorColumn] &&
+                        item[bathroomAeratorColumn] !== "" &&
+                        item[bathroomAeratorColumn] !== "0"
+                        ? getAeratorDescription(item[bathroomAeratorColumn] ?? "", "bathroom")
+                        : item._bathroomCount > 0
+                          ? getAeratorDescription(item._bathroomCount.toString(), "bathroom")
+                          : "No Touch."
                       : ""
-                    const shower =
-                      item._showerCount > 0
+                    const shower = (() => {
+                      const originalShowerValue = getShowerValue(item)
+                      if (originalShowerValue !== "No Touch.") {
+                        return originalShowerValue
+                      }
+                      // Use consolidation count as fallback
+                      return item._showerCount > 0
                         ? getAeratorDescription(item._showerCount.toString(), "shower")
-                        : getShowerValue(item)
-                    const toilet =
-                      item._toiletCount > 0
-                        ? `We replaced ${item._toiletCount > 1 ? "both toilets" : "toilet"}.`
-                        : hasToiletInstalled(item)
-                          ? "0.8 GPF"
-                          : ""
+                        : "No Touch."
+                    })()
+                    const toilet = hasToiletInstalled(item) ? "0.8 GPF" : ""
 
                     const compiledNotes = item._consolidatedNotes || compileNotesForUnit(item, true)
                     const finalNote = getFinalNoteForUnit(unitValue ?? "", compiledNotes)
