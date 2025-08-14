@@ -509,36 +509,33 @@ export default function ReportDetailPage({
                 )
 
                 const kitchenAerator = kitchenAeratorColumn
-                  ? // Check if original Excel data has quantity first, then use consolidation count as fallback
-                    item[kitchenAeratorColumn] &&
-                    item[kitchenAeratorColumn] !== "" &&
-                    item[kitchenAeratorColumn] !== "0"
-                    ? getAeratorDescription(item[kitchenAeratorColumn] ?? "", "kitchen")
-                    : item._kitchenCount > 0
-                      ? getAeratorDescription(item._kitchenCount.toString(), "kitchen")
+                  ? // Use consolidated count if available, otherwise use original Excel data
+                    item._kitchenCount > 0
+                    ? getAeratorDescription(item._kitchenCount.toString(), "kitchen")
+                    : item[kitchenAeratorColumn] &&
+                        item[kitchenAeratorColumn] !== "" &&
+                        item[kitchenAeratorColumn] !== "0"
+                      ? getAeratorDescription(item[kitchenAeratorColumn] ?? "", "kitchen")
                       : "No Touch."
                   : ""
                 const bathroomAerator = bathroomAeratorColumn
-                  ? // Check if original Excel data has quantity first, then use consolidation count as fallback
-                    item[bathroomAeratorColumn] &&
-                    item[bathroomAeratorColumn] !== "" &&
-                    item[bathroomAeratorColumn] !== "0"
-                    ? getAeratorDescription(item[bathroomAeratorColumn] ?? "", "bathroom")
-                    : item._bathroomCount > 0
-                      ? getAeratorDescription(item._bathroomCount.toString(), "bathroom")
+                  ? // Use consolidated count if available, otherwise use original Excel data
+                    item._bathroomCount > 0
+                    ? getAeratorDescription(item._bathroomCount.toString(), "bathroom")
+                    : item[bathroomAeratorColumn] &&
+                        item[bathroomAeratorColumn] !== "" &&
+                        item[bathroomAeratorColumn] !== "0"
+                      ? getAeratorDescription(item[bathroomAeratorColumn] ?? "", "bathroom")
                       : "No Touch."
                   : ""
                 const shower = (() => {
-                  const originalShowerValue = getShowerValue(item)
-                  if (originalShowerValue !== "No Touch.") {
-                    return originalShowerValue
+                  if (item._showerCount > 0) {
+                    return getAeratorDescription(item._showerCount.toString(), "shower")
                   }
-                  // Use consolidation count as fallback
-                  return item._showerCount > 0
-                    ? getAeratorDescription(item._showerCount.toString(), "shower")
-                    : "No Touch."
+                  const originalShowerValue = getShowerValue(item)
+                  return originalShowerValue
                 })()
-                const toilet = hasToiletInstalled(item) ? "0.8 GPF" : ""
+                const toilet = item._toiletCount > 0 ? "0.8 GPF" : hasToiletInstalled(item) ? "0.8 GPF" : ""
 
                 const compiledNotes = item._consolidatedNotes || compileNotesForUnit(item, true)
                 const finalNote = getFinalNoteForUnit(unitValue ?? "", compiledNotes)
@@ -707,36 +704,33 @@ export default function ReportDetailPage({
                     const unitValue = unitColumn ? item[unitColumn] : item.Unit
 
                     const kitchenAerator = kitchenAeratorColumn
-                      ? // Check if original Excel data has quantity first, then use consolidation count as fallback
-                        item[kitchenAeratorColumn] &&
-                        item[kitchenAeratorColumn] !== "" &&
-                        item[kitchenAeratorColumn] !== "0"
-                        ? getAeratorDescription(item[kitchenAeratorColumn] ?? "", "kitchen")
-                        : item._kitchenCount > 0
-                          ? getAeratorDescription(item._kitchenCount.toString(), "kitchen")
+                      ? // Use consolidated count if available, otherwise use original Excel data
+                        item._kitchenCount > 0
+                        ? getAeratorDescription(item._kitchenCount.toString(), "kitchen")
+                        : item[kitchenAeratorColumn] &&
+                            item[kitchenAeratorColumn] !== "" &&
+                            item[kitchenAeratorColumn] !== "0"
+                          ? getAeratorDescription(item[kitchenAeratorColumn] ?? "", "kitchen")
                           : "No Touch."
                       : ""
                     const bathroomAerator = bathroomAeratorColumn
-                      ? // Check if original Excel data has quantity first, then use consolidation count as fallback
-                        item[bathroomAeratorColumn] &&
-                        item[bathroomAeratorColumn] !== "" &&
-                        item[bathroomAeratorColumn] !== "0"
-                        ? getAeratorDescription(item[bathroomAeratorColumn] ?? "", "bathroom")
-                        : item._bathroomCount > 0
-                          ? getAeratorDescription(item._bathroomCount.toString(), "bathroom")
+                      ? // Use consolidated count if available, otherwise use original Excel data
+                        item._bathroomCount > 0
+                        ? getAeratorDescription(item._bathroomCount.toString(), "bathroom")
+                        : item[bathroomAeratorColumn] &&
+                            item[bathroomAeratorColumn] !== "" &&
+                            item[bathroomAeratorColumn] !== "0"
+                          ? getAeratorDescription(item[bathroomAeratorColumn] ?? "", "bathroom")
                           : "No Touch."
                       : ""
                     const shower = (() => {
-                      const originalShowerValue = getShowerValue(item)
-                      if (originalShowerValue !== "No Touch.") {
-                        return originalShowerValue
+                      if (item._showerCount > 0) {
+                        return getAeratorDescription(item._showerCount.toString(), "shower")
                       }
-                      // Use consolidation count as fallback
-                      return item._showerCount > 0
-                        ? getAeratorDescription(item._showerCount.toString(), "shower")
-                        : "No Touch."
+                      const originalShowerValue = getShowerValue(item)
+                      return originalShowerValue
                     })()
-                    const toilet = hasToiletInstalled(item) ? "0.8 GPF" : ""
+                    const toilet = item._toiletCount > 0 ? "0.8 GPF" : hasToiletInstalled(item) ? "0.8 GPF" : ""
 
                     const compiledNotes = item._consolidatedNotes || compileNotesForUnit(item, true)
                     const finalNote = getFinalNoteForUnit(unitValue ?? "", compiledNotes)
