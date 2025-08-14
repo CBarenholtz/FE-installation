@@ -439,44 +439,57 @@ export default function ReportNotesPage({ notes, isPreview = true, isEditable = 
 
   // Add function to add a new note
   const handleAddNote = () => {
-    console.log("🔥 Add Note button clicked!")
-    console.log("🔥 isEditable:", isEditable)
-    console.log("🔥 Current editedNotes length:", editedNotes.length)
+    console.log("🔥 STEP 1: Add Note button clicked!")
+    alert("STEP 1: Add Note button clicked!")
 
-    alert("Add Note button was clicked! Check console for details.")
+    console.log("🔥 STEP 2: Checking isEditable:", isEditable)
+    console.log("🔥 STEP 3: Current editedNotes length:", editedNotes.length)
+    console.log("🔥 STEP 4: Current editedNotes:", editedNotes)
 
     if (isEditable) {
-      console.log("🔥 isEditable is true, proceeding with note addition")
-
-      const newNote: Note = {
-        unit: "",
-        note: "",
-      }
-
-      // Add to the beginning of the array so it appears at the top
-      const updatedNotes = [newNote, ...editedNotes]
-      console.log("🔥 Adding new note, before:", editedNotes.length, "after:", updatedNotes.length)
-      console.log("🔥 New note object:", newNote)
-      console.log("🔥 Updated notes array:", updatedNotes)
+      console.log("🔥 STEP 5: isEditable is true, proceeding with note addition")
+      alert("STEP 5: isEditable is true, creating new note...")
 
       try {
+        console.log("🔥 STEP 6: Creating new note object")
+        const newNote: Note = {
+          unit: "",
+          note: "",
+        }
+        console.log("🔥 STEP 7: New note created:", newNote)
+        alert("STEP 7: New note object created successfully")
+
+        console.log("🔥 STEP 8: Creating updated notes array")
+        const updatedNotes = [newNote, ...editedNotes]
+        console.log("🔥 STEP 9: Updated notes array created, length:", updatedNotes.length)
+        alert(`STEP 9: Updated array created with ${updatedNotes.length} notes`)
+
+        console.log("🔥 STEP 10: Calling setEditedNotes")
         setEditedNotes(updatedNotes)
-        console.log("🔥 setEditedNotes called successfully")
+        console.log("🔥 STEP 11: setEditedNotes completed")
+        alert("STEP 11: setEditedNotes completed")
 
+        console.log("🔥 STEP 12: Calling setNotes")
         setNotes(updatedNotes)
-        console.log("🔥 setNotes called successfully")
+        console.log("🔥 STEP 13: setNotes completed")
+        alert("STEP 13: setNotes completed")
 
+        console.log("🔥 STEP 14: Updating localStorage")
         localStorage.setItem("reportNotes", JSON.stringify(updatedNotes))
-        console.log("🔥 localStorage updated successfully")
+        console.log("🔥 STEP 15: localStorage updated")
+        alert("STEP 15: localStorage updated successfully")
 
-        console.log("🔥 Add note operation completed successfully!")
+        console.log("🔥 STEP 16: Add note operation completed successfully!")
+        alert("STEP 16: Add note operation completed successfully!")
       } catch (error) {
-        console.error("🔥 Error during add note operation:", error)
-        alert("Error adding note: " + error.message)
+        console.error("🔥 ERROR: Exception during add note operation:", error)
+        console.error("🔥 ERROR: Error message:", error.message)
+        console.error("🔥 ERROR: Error stack:", error.stack)
+        alert("ERROR: " + error.message)
       }
     } else {
-      console.log("🔥 isEditable is false, cannot add note")
-      alert("Cannot add note: isEditable is false")
+      console.log("🔥 ERROR: isEditable is false, cannot add note")
+      alert("ERROR: Cannot add note - isEditable is false")
     }
   }
 
