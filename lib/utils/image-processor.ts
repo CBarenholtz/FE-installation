@@ -282,6 +282,8 @@ export function suggestCaptionsForImages(
 
 // Enhanced unit extraction with better pattern matching
 export function extractUnitFromFilename(filename: string): string {
+  console.log(`Extracting unit from filename: "${filename}"`)
+
   const patterns = [
     /^([A-Z]?\d+[A-Z]?)/i, // A01, B02, 1A, 2B at start
     /[_\-\s]([A-Z]?\d+[A-Z]?)[_\-\s.]/i, // _A01_, -B02-, A01.
@@ -291,13 +293,33 @@ export function extractUnitFromFilename(filename: string): string {
     /([A-Z]?\d+[A-Z]?)(?:[_\-\s]|$)/i, // A01 followed by separator or end
   ]
 
-  for (const pattern of patterns) {
+  const patternNames = [
+    "Start of filename",
+    "Surrounded by separators",
+    "After 'unit'",
+    "After 'apt'",
+    "After 'room'",
+    "Followed by separator or end",
+  ]
+
+  for (let i = 0; i < patterns.length; i++) {
+    const pattern = patterns[i]
     const match = filename.match(pattern)
     if (match) {
-      return match[1].toUpperCase()
+      const extractedUnit = match[1].toUpperCase()
+      console.log(`Pattern ${i + 1} (${patternNames[i]}) matched: "${match[0]}" -> extracted unit: "${extractedUnit}"`)
+
+      if (extractedUnit.length >= 2 || i === 0) {
+        // Prefer units with 2+ chars, or always accept first pattern
+        return extractedUnit
+      } else {
+        console.log(`Skipping short unit "${extractedUnit}" from pattern ${i + 1}, continuing to next pattern`)
+        continue
+      }
     }
   }
 
+  console.log(`No unit extracted from filename: "${filename}"`)
   return ""
 }
 
