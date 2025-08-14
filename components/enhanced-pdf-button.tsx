@@ -1404,9 +1404,30 @@ export default function EnhancedPdfButton({
         // Flatten images in sorted order
         const sortedImages = sortedUnits.flatMap((unit) => imagesByUnit[unit])
 
+        const loadedImages = await Promise.all(
+          sortedImages.map(async (image) => {
+            if (image.url && !image.googleDriveId) {
+              try {
+                const response = await fetch(image.url)
+                const blob = await response.blob()
+                return new Promise<{ image: any; dataUrl: string }>((resolve, reject) => {
+                  const reader = new FileReader()
+                  reader.onload = () => resolve({ image, dataUrl: reader.result as string })
+                  reader.onerror = reject
+                  reader.readAsDataURL(blob)
+                })
+              } catch (error) {
+                console.error("Error loading image:", error)
+                return { image, dataUrl: null }
+              }
+            }
+            return { image, dataUrl: null }
+          }),
+        )
+
         // Split into pages
-        for (let i = 0; i < sortedImages.length; i += imagesPerPage) {
-          const pageImages = sortedImages.slice(i, i + imagesPerPage)
+        for (let i = 0; i < loadedImages.length; i += imagesPerPage) {
+          const pageImages = loadedImages.slice(i, i + imagesPerPage)
 
           doc.addPage()
           addHeaderFooter(currentPage, totalPages)
@@ -1426,7 +1447,7 @@ export default function EnhancedPdfButton({
           const spacing = 10 // Spacing between images
 
           for (let j = 0; j < pageImages.length; j++) {
-            const image = pageImages[j]
+            const { image, dataUrl } = pageImages[j]
             const row = Math.floor(j / 2)
             const col = j % 2
 
@@ -1434,33 +1455,20 @@ export default function EnhancedPdfButton({
             const imgY = yPos + row * (imageHeight + 25) // 25mm for image + caption space
 
             try {
-              // Load and add image
-              if (image.url) {
-                // For Google Drive images, we need to handle them differently
-                if (image.googleDriveId) {
-                  // Create a placeholder for Google Drive images in PDF
-                  doc.setFillColor(240, 240, 240)
-                  doc.rect(imgX, imgY, imageWidth, imageHeight, "F")
-                  doc.setFontSize(10)
-                  doc.text("Google Drive Image", imgX + imageWidth / 2, imgY + imageHeight / 2, { align: "center" })
-                } else {
-                  // For blob URLs, try to add the image
-                  const img = new Image()
-                  img.crossOrigin = "anonymous"
-                  img.onload = () => {
-                    try {
-                      doc.addImage(img, "JPEG", imgX, imgY, imageWidth, imageHeight)
-                    } catch (error) {
-                      console.error("Error adding image to PDF:", error)
-                      // Add placeholder if image fails
-                      doc.setFillColor(240, 240, 240)
-                      doc.rect(imgX, imgY, imageWidth, imageHeight, "F")
-                      doc.setFontSize(10)
-                      doc.text("Image Error", imgX + imageWidth / 2, imgY + imageHeight / 2, { align: "center" })
-                    }
-                  }
-                  img.src = image.url
-                }
+              if (dataUrl) {
+                doc.addImage(dataUrl, "JPEG", imgX, imgY, imageWidth, imageHeight)
+              } else if (image.googleDriveId) {
+                // Create a placeholder for Google Drive images in PDF
+                doc.setFillColor(240, 240, 240)
+                doc.rect(imgX, imgY, imageWidth, imageHeight, "F")
+                doc.setFontSize(10)
+                doc.text("Google Drive Image", imgX + imageWidth / 2, imgY + imageHeight / 2, { align: "center" })
+              } else {
+                // Add placeholder if image fails
+                doc.setFillColor(240, 240, 240)
+                doc.rect(imgX, imgY, imageWidth, imageHeight, "F")
+                doc.setFontSize(10)
+                doc.text("Image Error", imgX + imageWidth / 2, imgY + imageHeight / 2, { align: "center" })
               }
 
               // Add caption below image

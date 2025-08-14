@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Upload, Link, X, ImageIcon, Wand2 } from "lucide-react"
 import type { ImageData, InstallationData, Note } from "@/lib/types"
-import { extractUnitFromFilename, suggestCaptionsForImages } from "@/lib/utils/image-processor"
+import { extractUnitFromFilename, setCaptionsFromUnitNotes } from "@/lib/utils/image-processor"
 import JSZip from "jszip"
 
 interface ImageUploadProps {
@@ -118,11 +118,10 @@ export default function ImageUpload({
     setGoogleDriveLinks("")
   }
 
-  // Auto-suggest captions using processing logic
   const handleAutoSuggestCaptions = () => {
-    const suggestedImages = suggestCaptionsForImages(images, installationData, notes)
-    setImages(suggestedImages)
-    onImagesUploaded(suggestedImages)
+    const captionedImages = setCaptionsFromUnitNotes(images, installationData, notes)
+    setImages(captionedImages)
+    onImagesUploaded(captionedImages)
   }
 
   const updateImage = (id: string, updates: Partial<ImageData>) => {

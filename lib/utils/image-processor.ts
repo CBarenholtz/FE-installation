@@ -360,3 +360,104 @@ export function analyzeImageMatching(
     suggestions,
   }
 }
+
+export function setCaptionsFromUnitNotes(
+  images: ImageData[],
+  installationData: InstallationData[],
+  notes: Note[],
+): ImageData[] {
+  return images.map((image) => {
+    // Find the unit's notes
+    const unitData = installationData.find((data) => data.Unit === image.unit)
+    const unitNotes = notes.filter((note) => note.unit === image.unit)
+
+    let caption = ""
+
+    // Priority 1: Use unit notes from the notes array
+    if (unitNotes.length > 0) {
+      caption = unitNotes[0].note // Use the first note for this unit
+    }
+    // Priority 2: Use general notes from installation data
+    else if (unitData?.Notes && unitData.Notes.trim()) {
+      caption = unitData.Notes.trim()
+    }
+    // Priority 3: Use leak issue notes
+    else if (unitData) {
+      const leakNotes = []
+
+      if (unitData["Leak Issue Kitchen Faucet"]) {
+        const severity = unitData["Leak Issue Kitchen Faucet"].trim().toLowerCase()
+        switch (severity) {
+          case "light":
+            leakNotes.push("Light leak from kitchen faucet")
+            break
+          case "moderate":
+            leakNotes.push("Moderate leak from kitchen faucet")
+            break
+          case "heavy":
+            leakNotes.push("Heavy leak from kitchen faucet")
+            break
+          case "dripping":
+          case "driping":
+            leakNotes.push("Dripping from kitchen faucet")
+            break
+          default:
+            if (severity) leakNotes.push("Leak from kitchen faucet")
+            break
+        }
+      }
+
+      if (unitData["Leak Issue Bath Faucet"]) {
+        const severity = unitData["Leak Issue Bath Faucet"].trim().toLowerCase()
+        switch (severity) {
+          case "light":
+            leakNotes.push("Light leak from bathroom faucet")
+            break
+          case "moderate":
+            leakNotes.push("Moderate leak from bathroom faucet")
+            break
+          case "heavy":
+            leakNotes.push("Heavy leak from bathroom faucet")
+            break
+          case "dripping":
+          case "driping":
+            leakNotes.push("Dripping from bathroom faucet")
+            break
+          default:
+            if (severity) leakNotes.push("Leak from bathroom faucet")
+            break
+        }
+      }
+
+      if (unitData["Tub Spout/Diverter Leak Issue"]) {
+        const severity = unitData["Tub Spout/Diverter Leak Issue"]
+        switch (severity) {
+          case "Light":
+            leakNotes.push("Light leak from tub spout/diverter")
+            break
+          case "Moderate":
+            leakNotes.push("Moderate leak from tub spout/diverter")
+            break
+          case "Heavy":
+            leakNotes.push("Heavy leak from tub spout/diverter")
+            break
+          default:
+            if (severity) leakNotes.push("Leak from tub spout/diverter")
+            break
+        }
+      }
+
+      caption = leakNotes.join(". ")
+    }
+
+    // Priority 4: Keep existing caption if no notes found
+    if (!caption) {
+      caption = image.caption || `Unit ${image.unit} installation photo`
+    }
+
+    return {
+      ...image,
+      caption: caption,
+    }
+  })
+}
