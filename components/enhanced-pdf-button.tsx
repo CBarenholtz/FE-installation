@@ -1442,8 +1442,8 @@ export default function EnhancedPdfButton({
           }
 
           // Add images in 2x2 grid
-          const imageWidth = 85 // Width for each image
-          const imageHeight = 60 // Height for each image
+          const maxImageWidth = 85 // Maximum width for each image
+          const maxImageHeight = 60 // Maximum height for each image
           const spacing = 10 // Spacing between images
 
           for (let j = 0; j < pageImages.length; j++) {
@@ -1451,43 +1451,83 @@ export default function EnhancedPdfButton({
             const row = Math.floor(j / 2)
             const col = j % 2
 
-            const imgX = 15 + col * (imageWidth + spacing)
-            const imgY = yPos + row * (imageHeight + 25) // 25mm for image + caption space
+            const baseImgX = 15 + col * (maxImageWidth + spacing)
+            const baseImgY = yPos + row * (maxImageHeight + 25) // 25mm for image + caption space
 
             try {
               if (dataUrl) {
-                doc.addImage(dataUrl, "JPEG", imgX, imgY, imageWidth, imageHeight)
+                const tempImg = new Image()
+                tempImg.src = dataUrl
+
+                // Calculate aspect ratio and proper dimensions
+                let imgWidth = maxImageWidth
+                let imgHeight = maxImageHeight
+
+                if (tempImg.width && tempImg.height) {
+                  const aspectRatio = tempImg.width / tempImg.height
+
+                  // Scale to fit within max dimensions while preserving aspect ratio
+                  if (aspectRatio > 1) {
+                    // Landscape: fit to width
+                    imgWidth = maxImageWidth
+                    imgHeight = imgWidth / aspectRatio
+                    if (imgHeight > maxImageHeight) {
+                      imgHeight = maxImageHeight
+                      imgWidth = imgHeight * aspectRatio
+                    }
+                  } else {
+                    // Portrait: fit to height
+                    imgHeight = maxImageHeight
+                    imgWidth = imgHeight * aspectRatio
+                    if (imgWidth > maxImageWidth) {
+                      imgWidth = maxImageWidth
+                      imgHeight = imgWidth / aspectRatio
+                    }
+                  }
+                }
+
+                // Center the image within the allocated space
+                const imgX = baseImgX + (maxImageWidth - imgWidth) / 2
+                const imgY = baseImgY + (maxImageHeight - imgHeight) / 2
+
+                doc.addImage(dataUrl, "JPEG", imgX, imgY, imgWidth, imgHeight)
               } else if (image.googleDriveId) {
                 // Create a placeholder for Google Drive images in PDF
                 doc.setFillColor(240, 240, 240)
-                doc.rect(imgX, imgY, imageWidth, imageHeight, "F")
+                doc.rect(baseImgX, baseImgY, maxImageWidth, maxImageHeight, "F")
                 doc.setFontSize(10)
-                doc.text("Google Drive Image", imgX + imageWidth / 2, imgY + imageHeight / 2, { align: "center" })
+                doc.text("Google Drive Image", baseImgX + maxImageWidth / 2, baseImgY + maxImageHeight / 2, {
+                  align: "center",
+                })
               } else {
                 // Add placeholder if image fails
                 doc.setFillColor(240, 240, 240)
-                doc.rect(imgX, imgY, imageWidth, imageHeight, "F")
+                doc.rect(baseImgX, baseImgY, maxImageWidth, maxImageHeight, "F")
                 doc.setFontSize(10)
-                doc.text("Image Error", imgX + imageWidth / 2, imgY + imageHeight / 2, { align: "center" })
+                doc.text("Image Error", baseImgX + maxImageWidth / 2, baseImgY + maxImageHeight / 2, {
+                  align: "center",
+                })
               }
 
               // Add caption below image
               doc.setFontSize(9)
               doc.setFont("helvetica", "bold")
-              doc.text(`Unit ${image.unit}`, imgX, imgY + imageHeight + 5)
+              doc.text(`Unit ${image.unit}`, baseImgX, baseImgY + maxImageHeight + 5)
               doc.setFont("helvetica", "normal")
               doc.setFontSize(8)
-              const captionLines = doc.splitTextToSize(image.caption || image.filename, imageWidth)
+              const captionLines = doc.splitTextToSize(image.caption || image.filename, maxImageWidth)
               captionLines.forEach((line: string, lineIndex: number) => {
-                doc.text(line, imgX, imgY + imageHeight + 10 + lineIndex * 3)
+                doc.text(line, baseImgX, baseImgY + maxImageHeight + 10 + lineIndex * 3)
               })
             } catch (error) {
               console.error("Error processing image for PDF:", error)
               // Add placeholder rectangle
               doc.setFillColor(240, 240, 240)
-              doc.rect(imgX, imgY, imageWidth, imageHeight, "F")
+              doc.rect(baseImgX, baseImgY, maxImageWidth, maxImageHeight, "F")
               doc.setFontSize(10)
-              doc.text("Image Unavailable", imgX + imageWidth / 2, imgY + imageHeight / 2, { align: "center" })
+              doc.text("Image Unavailable", baseImgX + maxImageWidth / 2, baseImgY + maxImageHeight / 2, {
+                align: "center",
+              })
             }
           }
 
