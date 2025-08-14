@@ -1459,6 +1459,12 @@ export default function EnhancedPdfButton({
                 const tempImg = new Image()
                 tempImg.src = dataUrl
 
+                // Wait for image to load to get accurate dimensions
+                await new Promise<void>((resolve) => {
+                  tempImg.onload = () => resolve()
+                  tempImg.onerror = () => resolve() // Continue even if image fails to load
+                })
+
                 // Calculate aspect ratio and proper dimensions
                 let imgWidth = maxImageWidth
                 let imgHeight = maxImageHeight
