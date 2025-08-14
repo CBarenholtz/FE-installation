@@ -371,6 +371,24 @@ export function setCaptionsFromUnitNotes(
   console.log("- Installation data:", installationData.length)
   console.log("- Notes:", notes.length)
 
+  if (installationData.length > 0) {
+    console.log("Sample installation data structure:")
+    console.log("Keys:", Object.keys(installationData[0]))
+    console.log("Full sample:", installationData[0])
+  }
+
+  if (notes.length > 0) {
+    console.log("Sample note structure:")
+    console.log("Keys:", Object.keys(notes[0]))
+    console.log("Full sample:", notes[0])
+  }
+
+  if (images.length > 0) {
+    console.log("Sample image structure:")
+    console.log("Keys:", Object.keys(images[0]))
+    console.log("Sample image unit:", images[0].unit)
+  }
+
   return images.map((image) => {
     console.log(`Processing image for unit ${image.unit}`)
 
@@ -380,6 +398,13 @@ export function setCaptionsFromUnitNotes(
 
     console.log(`Unit ${image.unit} - Found unit data:`, !!unitData)
     console.log(`Unit ${image.unit} - Found unit notes:`, unitNotes.length)
+
+    if (!unitData) {
+      console.log(
+        `Unit ${image.unit} - Available units in installation data:`,
+        installationData.map((d) => d.Unit).slice(0, 10),
+      )
+    }
 
     let caption = ""
 
@@ -395,6 +420,8 @@ export function setCaptionsFromUnitNotes(
     }
     // Priority 3: Use leak issue notes
     else if (unitData) {
+      console.log(`Unit ${image.unit} - Available properties:`, Object.keys(unitData))
+
       const leakNotes = []
 
       if (unitData["Leak Issue Kitchen Faucet"]) {
