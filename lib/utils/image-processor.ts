@@ -1,5 +1,4 @@
 import type { ImageData, ProcessedImage, InstallationData, Note } from "@/lib/types"
-import { analyzeMultipleImages } from "./image-analyzer"
 
 // Enhanced keyword matching for different types of issues
 const ISSUE_KEYWORDS = {
@@ -504,7 +503,83 @@ export function setCaptionsFromUnitNotes(
   })
 }
 
-// New AI-powered caption function
+// Direct Groq API call for image analysis
+interface GroqVisionResponse {
+  choices: Array<{
+    message: {
+      content: string
+    }
+  }>
+}
+
+interface ImageAnalysisResult {
+  fixtureType: "tub" | "kitchen_sink" | "bathroom_sink" | "unknown"
+  confidence: number
+}
+
+async function analyzeImageWithGroq(imageDataUrl: string): Promise<ImageAnalysisResult> {
+  try {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "llama-3.2-90b-vision-preview",
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: 'Analyze this image and identify what bathroom fixture is shown. Respond with ONLY one of these exact words: "tub", "kitchen_sink", "bathroom_sink", or "unknown". Look for: bathtubs, shower areas, kitchen sinks, bathroom sinks, faucets, or plumbing fixtures.',
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: imageDataUrl,
+                },
+              },
+            ],
+          },
+        ],
+        max_tokens: 10,
+        temperature: 0.1,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Groq API error: ${response.status}`)
+    }
+
+    const data: GroqVisionResponse = await response.json()
+    const content = data.choices[0]?.message?.content?.toLowerCase().trim()
+
+    console.log("🤖 Groq API response:", content)
+
+    // Parse the response
+    let fixtureType: ImageAnalysisResult["fixtureType"] = "unknown"
+    let confidence = 0.3
+
+    if (content?.includes("tub")) {
+      fixtureType = "tub"
+      confidence = 0.8
+    } else if (content?.includes("kitchen_sink")) {
+      fixtureType = "kitchen_sink"
+      confidence = 0.8
+    } else if (content?.includes("bathroom_sink")) {
+      fixtureType = "bathroom_sink"
+      confidence = 0.8
+    }
+
+    return { fixtureType, confidence }
+  } catch (error) {
+    console.error("🤖 Error analyzing image with Groq:", error)
+    return { fixtureType: "unknown", confidence: 0 }
+  }
+}
+
 export async function setCaptionsFromAIAnalysis(
   images: ImageData[],
   installationData: InstallationData[],
@@ -547,37 +622,33 @@ export async function setCaptionsFromAIAnalysis(
   console.log("- Kitchen Sink:", kitchSinkColumn)
   console.log("- Bath Sink:", bathSinkColumn)
 
-  // Prepare images for AI analysis
-  const imagesToAnalyze = images
-    .filter((img) => img.url && img.unit) // Only analyze images with URLs and units
-    .map((img) => ({
-      id: img.id,
-      dataUrl: img.url,
-    }))
+  // Process images with AI analysis
+  const updatedImages: ImageData[] = []
 
-  if (imagesToAnalyze.length === 0) {
-    console.log("No valid images to analyze")
-    return images
-  }
+  for (const image of images) {
+    if (!image.url || !image.unit) {
+      console.log(`🤖 Skipping image ${image.filename} - missing URL or unit`)
+      updatedImages.push(image)
+      continue
+    }
 
-  try {
-    // Analyze images with AI
-    console.log(`🤖 Analyzing ${imagesToAnalyze.length} images...`)
-    const analysisResults = await analyzeMultipleImages(imagesToAnalyze)
+    try {
+      console.log(`🤖 Analyzing image: ${image.filename}`)
+      const analysis = await analyzeImageWithGroq(image.url)
 
-    // Apply AI analysis results to generate captions
-    const updatedImages = images.map((image) => {
-      const analysis = analysisResults.get(image.id)
-
-      if (!analysis || analysis.confidence < 0.3) {
-        console.log(`🤖 Low confidence or no analysis for ${image.filename}, using fallback`)
-        return setCaptionFromFallback(image, installationData, tubLeakColumn, kitchSinkColumn, bathSinkColumn)
+      if (analysis.confidence < 0.3) {
+        console.log(`🤖 Low confidence for ${image.filename}, using fallback`)
+        updatedImages.push(
+          setCaptionFromFallback(image, installationData, tubLeakColumn, kitchSinkColumn, bathSinkColumn),
+        )
+        continue
       }
 
       const unitData = installationData.find((data) => data.Unit === image.unit)
       if (!unitData) {
         console.log(`🤖 No unit data found for ${image.unit}`)
-        return image
+        updatedImages.push(image)
+        continue
       }
 
       let caption = ""
@@ -607,27 +678,34 @@ export async function setCaptionsFromAIAnalysis(
           break
         default:
           console.log(`🤖 AI detected "${analysis.fixtureType}" with low confidence, using fallback`)
-          return setCaptionFromFallback(image, installationData, tubLeakColumn, kitchSinkColumn, bathSinkColumn)
+          updatedImages.push(
+            setCaptionFromFallback(image, installationData, tubLeakColumn, kitchSinkColumn, bathSinkColumn),
+          )
+          continue
       }
 
       if (!caption) {
         console.log(`🤖 No matching leak data for detected fixture type: ${analysis.fixtureType}`)
-        return setCaptionFromFallback(image, installationData, tubLeakColumn, kitchSinkColumn, bathSinkColumn)
+        updatedImages.push(
+          setCaptionFromFallback(image, installationData, tubLeakColumn, kitchSinkColumn, bathSinkColumn),
+        )
+        continue
       }
 
-      return {
+      updatedImages.push({
         ...image,
         caption: caption,
-      }
-    })
-
-    console.log("🤖 AI caption analysis complete!")
-    return updatedImages
-  } catch (error) {
-    console.error("🤖 Error in AI analysis, falling back to filename-based captions:", error)
-    // Fallback to existing filename-based logic
-    return setCaptionsFromUnitNotes(images, installationData, notes)
+      })
+    } catch (error) {
+      console.error(`🤖 Error analyzing ${image.filename}:`, error)
+      updatedImages.push(
+        setCaptionFromFallback(image, installationData, tubLeakColumn, kitchSinkColumn, bathSinkColumn),
+      )
+    }
   }
+
+  console.log("🤖 AI caption analysis complete!")
+  return updatedImages
 }
 
 // Helper function for fallback caption assignment

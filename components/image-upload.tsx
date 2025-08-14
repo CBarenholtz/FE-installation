@@ -134,10 +134,15 @@ export default function ImageUpload({
       return
     }
 
+    if (!process.env.GROQ_API_KEY) {
+      alert("AI analysis requires Groq API configuration. Please check your environment settings.")
+      return
+    }
+
     setIsProcessing(true)
 
     try {
-      // Use AI-powered caption analysis
+      // Use AI-powered caption analysis with direct API calls
       console.log("🤖 Starting AI-powered caption analysis...")
       const captionedImages = await setCaptionsFromAIAnalysis(images, installationData, notes)
 
