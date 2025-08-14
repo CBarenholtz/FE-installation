@@ -5,7 +5,7 @@ import { getAeratorDescription, formatNote } from "@/lib/utils/aerator-helpers"
 import { useReportContext } from "@/lib/report-context"
 import { Button } from "@/components/ui/button"
 import { Plus, Trash2 } from "lucide-react"
-import { getFinalNoteForUnit, updateStoredNote, getStoredNotes } from "@/lib/notes"
+import { updateStoredNote, getStoredNotes } from "@/lib/notes"
 
 interface InstallationData {
   Unit: string
@@ -174,83 +174,71 @@ export default function ReportDetailPage({
       result.push(item)
     }
 
-    // Group installations by unit and sum quantities from the correct columns
+    // Group installations by unit and read quantities from specific Excel columns
     const consolidatedData: Record<
       string,
       {
         unit: string
-        kitchenCount: number
-        bathroomCount: number
-        showerCount: number
-        toiletCount: number
+        kitchenQuantity: number
+        bathroomQuantity: number
+        showerADAQuantity: number
+        showerRegularQuantity: number
+        toiletQuantity: number
         notes: string[]
         originalItem: InstallationData
       }
     > = {}
 
-    // Helper function to find quantity columns
-    const findQuantityColumns = () => {
+    // Helper function to find specific quantity columns
+    const findSpecificColumns = () => {
       if (!result.length) return {}
 
       const firstItem = result[0]
       const keys = Object.keys(firstItem)
 
-      // Look for quantity columns that contain numeric values
-      const quantityColumns = {
-        toilet: keys.find((key) => {
+      const columns = {
+        // Kitchen aerator column (for type, quantity always 1 if exists)
+        kitchenAerator: keys.find((key) => {
           const lowerKey = key.toLowerCase()
-          return (
-            (lowerKey.includes("toilet") && (lowerKey.includes("install") || lowerKey.includes(":"))) ||
-            lowerKey === "toilets"
-          )
+          return lowerKey.includes("kitchen") && lowerKey.includes("aerator")
         }),
-        shower: keys.find((key) => {
-          const lowerKey = key.toLowerCase()
-          return (
-            (lowerKey.includes("shower") &&
-              !lowerKey.includes("head") &&
-              (lowerKey.includes("install") || lowerKey.includes(":"))) ||
-            lowerKey === "shower"
-          )
-        }),
-        showerhead: keys.find((key) => {
-          const lowerKey = key.toLowerCase()
-          return (lowerKey.includes("shower") && lowerKey.includes("head")) || lowerKey === "showerhead"
-        }),
-        supply: keys.find((key) => {
-          const lowerKey = key.toLowerCase()
-          return lowerKey.includes("supply") || lowerKey === "supply line" || lowerKey === "supply li"
-        }),
-        ada: keys.find((key) => {
-          const lowerKey = key.toLowerCase()
-          return lowerKey.includes("ada")
-        }),
-        kitchen: keys.find((key) => {
-          const lowerKey = key.toLowerCase()
-          return lowerKey.includes("kitchen") && (lowerKey.includes("install") || lowerKey.includes(":"))
-        }),
-        bathroom: keys.find((key) => {
-          const lowerKey = key.toLowerCase()
-          return lowerKey.includes("bathroom") && (lowerKey.includes("install") || lowerKey.includes(":"))
-        }),
-        numericColumns: keys.filter((key) => {
-          // Check if this column contains mostly numeric values
-          const sampleValues = result
-            .slice(0, 5)
-            .map((item) => item[key])
-            .filter((val) => val != null && val !== "")
-          if (sampleValues.length === 0) return false
 
-          const numericCount = sampleValues.filter((val) => !isNaN(Number(val)) && Number(val) > 0).length
-          return numericCount / sampleValues.length > 0.5 // More than 50% are numeric
+        // Bathroom aerator columns (count both guest and master)
+        bathroomAeratorGuest: keys.find((key) => {
+          const lowerKey = key.toLowerCase()
+          return lowerKey.includes("bathroom") && lowerKey.includes("aerator") && lowerKey.includes("guest")
+        }),
+        bathroomAeratorMaster: keys.find((key) => {
+          const lowerKey = key.toLowerCase()
+          return lowerKey.includes("bathroom") && lowerKey.includes("aerator") && lowerKey.includes("master")
+        }),
+
+        // Shower columns (read actual quantities)
+        adaShowerHead: keys.find((key) => {
+          const lowerKey = key.toLowerCase()
+          return lowerKey.includes("ada") && lowerKey.includes("shower")
+        }),
+        regularShowerHead: keys.find((key) => {
+          const lowerKey = key.toLowerCase()
+          return (
+            lowerKey.includes("shower") &&
+            (lowerKey.includes("head") || lowerKey === "showerhead") &&
+            !lowerKey.includes("ada")
+          )
+        }),
+
+        // Toilet installation column (read direct quantity)
+        toiletInstalled: keys.find((key) => {
+          const lowerKey = key.toLowerCase()
+          return lowerKey.includes("toilet") && lowerKey.includes("install")
         }),
       }
 
-      console.log("Found quantity columns:", quantityColumns)
-      return quantityColumns
+      console.log("Found specific columns:", columns)
+      return columns
     }
 
-    const quantityColumns = findQuantityColumns()
+    const specificColumns = findSpecificColumns()
 
     // Process each row and consolidate by unit
     for (const item of result) {
@@ -263,90 +251,62 @@ export default function ReportDetailPage({
       if (!consolidatedData[unitKey]) {
         consolidatedData[unitKey] = {
           unit: unitKey,
-          kitchenCount: 0,
-          bathroomCount: 0,
-          showerCount: 0,
-          toiletCount: 0,
+          kitchenQuantity: 0,
+          bathroomQuantity: 0,
+          showerADAQuantity: 0,
+          showerRegularQuantity: 0,
+          toiletQuantity: 0,
           notes: [],
           originalItem: item,
         }
       }
 
-      console.log(`Debug Unit ${unitKey}:`, {
-        toiletColumn: quantityColumns.toilet,
-        toiletValue: quantityColumns.toilet ? item[quantityColumns.toilet] : "N/A",
-        showerColumn: quantityColumns.shower,
-        showerValue: quantityColumns.shower ? item[quantityColumns.shower] : "N/A",
-        supplyColumn: quantityColumns.supply,
-        supplyValue: quantityColumns.supply ? item[quantityColumns.supply] : "N/A",
-      })
+      console.log(`Processing Unit ${unitKey}:`)
 
-      // For each row of the same unit, increment count by 1 regardless of Excel values
-      if (quantityColumns.toilet && item[quantityColumns.toilet]) {
-        console.log(`Toilet row count for ${unitKey}: +1 (was ${item[quantityColumns.toilet]})`)
-        consolidatedData[unitKey].toiletCount += 1 // Always increment by 1 per row
-      }
-
-      if (quantityColumns.shower && item[quantityColumns.shower]) {
-        console.log(`Shower row count for ${unitKey}: +1 (was ${item[quantityColumns.shower]})`)
-        consolidatedData[unitKey].showerCount += 1 // Always increment by 1 per row
-      }
-
-      if (quantityColumns.showerhead && item[quantityColumns.showerhead]) {
-        console.log(`Showerhead row count for ${unitKey}: +1 (was ${item[quantityColumns.showerhead]})`)
-        consolidatedData[unitKey].showerCount += 1 // Always increment by 1 per row
-      }
-
-      if (quantityColumns.supply && item[quantityColumns.supply]) {
-        console.log(`Supply row count for ${unitKey}: +1 (was ${item[quantityColumns.supply]})`)
-        // Supply lines typically correspond to kitchen/bathroom aerators
-        consolidatedData[unitKey].kitchenCount += 1 // Always increment by 1 per row
-        consolidatedData[unitKey].bathroomCount += 1 // Always increment by 1 per row
-      }
-
-      if (quantityColumns.ada && item[quantityColumns.ada]) {
-        console.log(`ADA row count for ${unitKey}: +1 (was ${item[quantityColumns.ada]})`)
-        consolidatedData[unitKey].showerCount += 1 // Always increment by 1 per row
-      }
-
-      if (quantityColumns.kitchen && item[quantityColumns.kitchen]) {
-        console.log(`Kitchen row count for ${unitKey}: +1 (was ${item[quantityColumns.kitchen]})`)
-        consolidatedData[unitKey].kitchenCount += 1 // Always increment by 1 per row
-      }
-
-      if (quantityColumns.bathroom && item[quantityColumns.bathroom]) {
-        console.log(`Bathroom row count for ${unitKey}: +1 (was ${item[quantityColumns.bathroom]})`)
-        consolidatedData[unitKey].bathroomCount += 1 // Always increment by 1 per row
-      }
-
-      if (
-        !quantityColumns.toilet &&
-        !quantityColumns.shower &&
-        !quantityColumns.supply &&
-        quantityColumns.numericColumns.length > 0
-      ) {
-        console.log(`Using fallback numeric columns for ${unitKey}:`, quantityColumns.numericColumns)
-        for (const numericCol of quantityColumns.numericColumns) {
-          const quantity = Number.parseInt(String(item[numericCol])) || 0
-          if (quantity > 0) {
-            // Try to infer what type of installation based on column name
-            const lowerCol = numericCol.toLowerCase()
-            if (lowerCol.includes("kitchen")) {
-              consolidatedData[unitKey].kitchenCount += 1 // Always increment by 1 per row
-            } else if (lowerCol.includes("bathroom") || lowerCol.includes("bath")) {
-              consolidatedData[unitKey].bathroomCount += 1 // Always increment by 1 per row
-            } else if (lowerCol.includes("shower")) {
-              consolidatedData[unitKey].showerCount += 1 // Always increment by 1 per row
-            } else if (lowerCol.includes("toilet")) {
-              consolidatedData[unitKey].toiletCount += 1 // Always increment by 1 per row
-            } else {
-              // Default: assume it's a general installation count
-              consolidatedData[unitKey].kitchenCount += 1 // Always increment by 1 per row
-              consolidatedData[unitKey].bathroomCount += 1 // Always increment by 1 per row
-            }
-            console.log(`Inferred ${numericCol} row count for ${unitKey}: +1`)
-          }
+      // Kitchen: Always 1 if kitchen aerator column has data
+      if (specificColumns.kitchenAerator && item[specificColumns.kitchenAerator]) {
+        const kitchenValue = String(item[specificColumns.kitchenAerator]).trim()
+        if (kitchenValue && kitchenValue !== "" && kitchenValue !== "0") {
+          consolidatedData[unitKey].kitchenQuantity = 1
+          console.log(`Kitchen quantity for ${unitKey}: 1 (has data: ${kitchenValue})`)
         }
+      }
+
+      // Bathroom: Count guest + master columns (each counts as 1 if has data)
+      let bathroomCount = 0
+      if (specificColumns.bathroomAeratorGuest && item[specificColumns.bathroomAeratorGuest]) {
+        const guestValue = String(item[specificColumns.bathroomAeratorGuest]).trim()
+        if (guestValue && guestValue !== "" && guestValue !== "0") {
+          bathroomCount += 1
+          console.log(`Bathroom Guest for ${unitKey}: +1 (has data: ${guestValue})`)
+        }
+      }
+      if (specificColumns.bathroomAeratorMaster && item[specificColumns.bathroomAeratorMaster]) {
+        const masterValue = String(item[specificColumns.bathroomAeratorMaster]).trim()
+        if (masterValue && masterValue !== "" && masterValue !== "0") {
+          bathroomCount += 1
+          console.log(`Bathroom Master for ${unitKey}: +1 (has data: ${masterValue})`)
+        }
+      }
+      consolidatedData[unitKey].bathroomQuantity = bathroomCount
+
+      // Shower: Read actual quantities from both columns
+      if (specificColumns.adaShowerHead && item[specificColumns.adaShowerHead]) {
+        const adaQuantity = Number.parseInt(String(item[specificColumns.adaShowerHead])) || 0
+        consolidatedData[unitKey].showerADAQuantity = adaQuantity
+        console.log(`ADA Shower quantity for ${unitKey}: ${adaQuantity}`)
+      }
+      if (specificColumns.regularShowerHead && item[specificColumns.regularShowerHead]) {
+        const regularQuantity = Number.parseInt(String(item[specificColumns.regularShowerHead])) || 0
+        consolidatedData[unitKey].showerRegularQuantity = regularQuantity
+        console.log(`Regular Shower quantity for ${unitKey}: ${regularQuantity}`)
+      }
+
+      // Toilet: Read direct quantity from toilets installed column
+      if (specificColumns.toiletInstalled && item[specificColumns.toiletInstalled]) {
+        const toiletQuantity = Number.parseInt(String(item[specificColumns.toiletInstalled])) || 0
+        consolidatedData[unitKey].toiletQuantity = toiletQuantity
+        console.log(`Toilet quantity for ${unitKey}: ${toiletQuantity}`)
       }
 
       // Collect notes
@@ -356,16 +316,17 @@ export default function ReportDetailPage({
       }
     }
 
-    // Convert back to array format with consolidated data
+    // Convert back to array format with new quantity data
     const consolidatedResult = Object.values(consolidatedData).map((unitData) => {
-      // Create a new item with consolidated information
+      // Create a new item with quantity information
       const consolidatedItem = { ...unitData.originalItem }
 
-      // Store summed quantities in the item for later use
-      consolidatedItem._kitchenCount = unitData.kitchenCount
-      consolidatedItem._bathroomCount = unitData.bathroomCount
-      consolidatedItem._showerCount = unitData.showerCount
-      consolidatedItem._toiletCount = unitData.toiletCount
+      // Store quantities in the item for later use
+      consolidatedItem._kitchenQuantity = unitData.kitchenQuantity
+      consolidatedItem._bathroomQuantity = unitData.bathroomQuantity
+      consolidatedItem._showerADAQuantity = unitData.showerADAQuantity
+      consolidatedItem._showerRegularQuantity = unitData.showerRegularQuantity
+      consolidatedItem._toiletQuantity = unitData.toiletQuantity
       consolidatedItem._consolidatedNotes = [...new Set(unitData.notes)].join(" ")
 
       return consolidatedItem
@@ -386,35 +347,11 @@ export default function ReportDetailPage({
     })
   })()
 
-  // Split data into pages
-  const itemsPerPage = 10
-  const dataPages = []
-  for (let i = 0; i < filteredData.length; i += itemsPerPage) {
-    dataPages.push(filteredData.slice(i, i + itemsPerPage))
-  }
-
   // Check what columns to show
-  const hasKitchenAerators =
-    kitchenAeratorColumn &&
-    filteredData.some((item) => {
-      const value = item[kitchenAeratorColumn]
-      return value !== undefined && value !== null && value !== "" && value.trim() !== ""
-    })
-
-  const hasBathroomAerators =
-    bathroomAeratorColumn &&
-    filteredData.some((item) => {
-      const value = item[bathroomAeratorColumn]
-      return value !== undefined && value !== null && value !== "" && value.trim() !== ""
-    })
-
-  const hasShowers = filteredData.some((item) => {
-    const showerValue =
-      item._showerCount > 0 ? getAeratorDescription(item._showerCount.toString(), "shower") : getShowerValue(item)
-    return showerValue !== "No Touch."
-  })
-
-  const hasToilets = filteredData.some((item) => item._toiletCount > 0)
+  const hasKitchenAerators = filteredData.some((item) => item._kitchenQuantity > 0)
+  const hasBathroomAerators = filteredData.some((item) => item._bathroomQuantity > 0)
+  const hasShowers = filteredData.some((item) => item._showerADAQuantity > 0 || item._showerRegularQuantity > 0)
+  const hasToilets = filteredData.some((item) => item._toiletQuantity > 0)
   const hasNotes = true
 
   // Event handlers
@@ -608,54 +545,45 @@ export default function ReportDetailPage({
                   (row) => (unitColumn ? row[unitColumn] : row.Unit) === unitValue,
                 )
 
-                const kitchenAerator = kitchenAeratorColumn
-                  ? // Check consolidated count first, then fall back to original Excel data
-                    item._kitchenCount > 0
-                    ? (() => {
-                        console.log(`Using consolidated kitchen count for ${unitValue}: ${item._kitchenCount}`)
-                        return getAeratorDescription(item._kitchenCount.toString(), "kitchen")
-                      })()
-                    : item[kitchenAeratorColumn] &&
-                        item[kitchenAeratorColumn] !== "" &&
-                        item[kitchenAeratorColumn] !== "0"
-                      ? (() => {
-                          console.log(`Using original kitchen data for ${unitValue}: ${item[kitchenAeratorColumn]}`)
-                          return getAeratorDescription(item[kitchenAeratorColumn] ?? "", "kitchen")
-                        })()
-                      : "No Touch."
-                  : ""
-
-                const bathroomAerator = bathroomAeratorColumn
-                  ? // Check consolidated count first, then fall back to original Excel data
-                    item._bathroomCount > 0
-                    ? (() => {
-                        console.log(`Using consolidated bathroom count for ${unitValue}: ${item._bathroomCount}`)
-                        return getAeratorDescription(item._bathroomCount.toString(), "bathroom")
-                      })()
-                    : item[bathroomAeratorColumn] &&
-                        item[bathroomAeratorColumn] !== "" &&
-                        item[bathroomAeratorColumn] !== "0"
-                      ? (() => {
-                          console.log(`Using original bathroom data for ${unitValue}: ${item[bathroomAeratorColumn]}`)
-                          return getAeratorDescription(item[bathroomAeratorColumn] ?? "", "bathroom")
-                        })()
-                      : "No Touch."
-                  : ""
-
-                const shower = (() => {
-                  if (item._showerCount > 0) {
-                    console.log(`Using consolidated shower count for ${unitValue}: ${item._showerCount}`)
-                    return getAeratorDescription(item._showerCount.toString(), "shower")
+                const kitchenAerator = (() => {
+                  if (unitValue !== undefined && editedInstallations[unitValue]?.kitchen !== undefined) {
+                    return editedInstallations[unitValue]!.kitchen
                   }
-                  const originalShowerValue = getShowerValue(item)
-                  console.log(`Using original shower data for ${unitValue}: ${originalShowerValue}`)
-                  return originalShowerValue
+                  return item._kitchenQuantity > 0 ? "1.0 GPM (1)" : "No Touch."
                 })()
 
-                const toilet = item._toiletCount > 0 ? "0.8 GPF" : hasToiletInstalled(item) ? "0.8 GPF" : ""
+                const bathroomAerator = (() => {
+                  if (unitValue !== undefined && editedInstallations[unitValue]?.bathroom !== undefined) {
+                    return editedInstallations[unitValue]!.bathroom
+                  }
+                  if (item._bathroomQuantity > 0) {
+                    return `1.0 GPM (${item._bathroomQuantity})`
+                  }
+                  return "No Touch."
+                })()
 
-                const compiledNotes = item._consolidatedNotes || compileNotesForUnit(item, true)
-                const finalNote = getFinalNoteForUnit(unitValue ?? "", compiledNotes)
+                const shower = (() => {
+                  if (unitValue !== undefined && editedInstallations[unitValue]?.shower !== undefined) {
+                    return editedInstallations[unitValue]!.shower
+                  }
+
+                  const parts = []
+                  if (item._showerRegularQuantity > 0) {
+                    parts.push(`1.75 GPM (${item._showerRegularQuantity})`)
+                  }
+                  if (item._showerADAQuantity > 0) {
+                    parts.push(`1.5 GPM (${item._showerADAQuantity})`)
+                  }
+
+                  return parts.length > 0 ? parts.join("; ") : "No Touch."
+                })()
+
+                const toilet = (() => {
+                  if (unitValue !== undefined && editedInstallations[unitValue]?.toilet !== undefined) {
+                    return editedInstallations[unitValue]!.toilet
+                  }
+                  return item._toiletQuantity > 0 ? `0.8 GPF (${item._toiletQuantity})` : ""
+                })()
 
                 return (
                   <tr key={index}>
@@ -757,7 +685,9 @@ export default function ReportDetailPage({
                         {isEditable ? (
                           <EditableText
                             value={
-                              editedNotes[unitValue ?? ""] !== undefined ? editedNotes[unitValue ?? ""] : finalNote
+                              editedNotes[unitValue ?? ""] !== undefined
+                                ? editedNotes[unitValue ?? ""]
+                                : item._consolidatedNotes
                             }
                             onChange={(value) => handleNoteEdit(unitValue ?? "", value)}
                             placeholder="Notes"
@@ -765,7 +695,7 @@ export default function ReportDetailPage({
                         ) : editedNotes[unitValue ?? ""] !== undefined ? (
                           editedNotes[unitValue ?? ""]
                         ) : (
-                          finalNote
+                          item._consolidatedNotes
                         )}
                       </td>
                     )}
@@ -803,8 +733,8 @@ export default function ReportDetailPage({
       {/* Print Mode - Multiple Pages */}
       {!isPreview && (
         <div className="space-y-8">
-          {dataPages.map((pageData, pageIndex) => (
-            <div key={pageIndex} className="page-break-before">
+          {filteredData.map((item, index) => (
+            <div key={index} className="page-break-before">
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="bg-gray-50">
@@ -817,103 +747,68 @@ export default function ReportDetailPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {pageData.map((item, index) => {
-                    const unitValue = unitColumn ? item[unitColumn] : item.Unit
+                  <tr key={index}>
+                    <td className="py-2 px-2 border-b">{unitColumn ? item[unitColumn] : item.Unit}</td>
+                    {hasKitchenAerators && (
+                      <td className="py-2 px-2 border-b text-center">
+                        {(() => {
+                          if (unitColumn && editedInstallations[item[unitColumn] ?? ""]?.kitchen !== undefined) {
+                            return editedInstallations[item[unitColumn] ?? ""]!.kitchen
+                          }
+                          return item._kitchenQuantity > 0 ? "1.0 GPM (1)" : "No Touch."
+                        })()}
+                      </td>
+                    )}
+                    {hasBathroomAerators && (
+                      <td className="py-2 px-2 border-b text-center">
+                        {(() => {
+                          if (unitColumn && editedInstallations[item[unitColumn] ?? ""]?.bathroom !== undefined) {
+                            return editedInstallations[item[unitColumn] ?? ""]!.bathroom
+                          }
+                          if (item._bathroomQuantity > 0) {
+                            return `1.0 GPM (${item._bathroomQuantity})`
+                          }
+                          return "No Touch."
+                        })()}
+                      </td>
+                    )}
+                    {hasShowers && (
+                      <td className="py-2 px-2 border-b text-center">
+                        {(() => {
+                          if (unitColumn && editedInstallations[item[unitColumn] ?? ""]?.shower !== undefined) {
+                            return editedInstallations[item[unitColumn] ?? ""]!.shower
+                          }
 
-                    const kitchenAerator = kitchenAeratorColumn
-                      ? // Check consolidated count first, then fall back to original Excel data
-                        item._kitchenCount > 0
-                        ? (() => {
-                            console.log(`Using consolidated kitchen count for ${unitValue}: ${item._kitchenCount}`)
-                            return getAeratorDescription(item._kitchenCount.toString(), "kitchen")
-                          })()
-                        : item[kitchenAeratorColumn] &&
-                            item[kitchenAeratorColumn] !== "" &&
-                            item[kitchenAeratorColumn] !== "0"
-                          ? (() => {
-                              console.log(`Using original kitchen data for ${unitValue}: ${item[kitchenAeratorColumn]}`)
-                              return getAeratorDescription(item[kitchenAeratorColumn] ?? "", "kitchen")
-                            })()
-                          : "No Touch."
-                      : ""
+                          const parts = []
+                          if (item._showerRegularQuantity > 0) {
+                            parts.push(`1.75 GPM (${item._showerRegularQuantity})`)
+                          }
+                          if (item._showerADAQuantity > 0) {
+                            parts.push(`1.5 GPM (${item._showerADAQuantity})`)
+                          }
 
-                    const bathroomAerator = bathroomAeratorColumn
-                      ? // Check consolidated count first, then fall back to original Excel data
-                        item._bathroomCount > 0
-                        ? (() => {
-                            console.log(`Using consolidated bathroom count for ${unitValue}: ${item._bathroomCount}`)
-                            return getAeratorDescription(item._bathroomCount.toString(), "bathroom")
-                          })()
-                        : item[bathroomAeratorColumn] &&
-                            item[bathroomAeratorColumn] !== "" &&
-                            item[bathroomAeratorColumn] !== "0"
-                          ? (() => {
-                              console.log(
-                                `Using original bathroom data for ${unitValue}: ${item[bathroomAeratorColumn]}`,
-                              )
-                              return getAeratorDescription(item[bathroomAeratorColumn] ?? "", "bathroom")
-                            })()
-                          : "No Touch."
-                      : ""
-
-                    const shower = (() => {
-                      if (item._showerCount > 0) {
-                        console.log(`Using consolidated shower count for ${unitValue}: ${item._showerCount}`)
-                        return getAeratorDescription(item._showerCount.toString(), "shower")
-                      }
-                      const originalShowerValue = getShowerValue(item)
-                      console.log(`Using original shower data for ${unitValue}: ${originalShowerValue}`)
-                      return originalShowerValue
-                    })()
-
-                    const toilet = item._toiletCount > 0 ? "0.8 GPF" : hasToiletInstalled(item) ? "0.8 GPF" : ""
-
-                    const compiledNotes = item._consolidatedNotes || compileNotesForUnit(item, true)
-                    const finalNote = getFinalNoteForUnit(unitValue ?? "", compiledNotes)
-
-                    return (
-                      <tr key={index}>
-                        <td className="py-2 px-2 border-b">
-                          {unitValue !== undefined && editedUnits[unitValue] !== undefined
-                            ? editedUnits[unitValue]
-                            : unitValue}
-                        </td>
-                        {hasKitchenAerators && (
-                          <td className="py-2 px-2 border-b text-center">
-                            {unitValue !== undefined && editedInstallations[unitValue]?.kitchen !== undefined
-                              ? editedInstallations[unitValue]!.kitchen
-                              : kitchenAerator}
-                          </td>
-                        )}
-                        {hasBathroomAerators && (
-                          <td className="py-2 px-2 border-b text-center">
-                            {unitValue !== undefined && editedInstallations[unitValue]?.bathroom !== undefined
-                              ? editedInstallations[unitValue]!.bathroom
-                              : bathroomAerator}
-                          </td>
-                        )}
-                        {hasShowers && (
-                          <td className="py-2 px-2 border-b text-center">
-                            {unitValue !== undefined && editedInstallations[unitValue]?.shower !== undefined
-                              ? editedInstallations[unitValue]!.shower
-                              : shower}
-                          </td>
-                        )}
-                        {hasToilets && (
-                          <td className="py-2 px-2 border-b text-center">
-                            {unitValue !== undefined && editedInstallations[unitValue]?.toilet !== undefined
-                              ? editedInstallations[unitValue]!.toilet
-                              : toilet}
-                          </td>
-                        )}
-                        {hasNotes && (
-                          <td className="py-2 px-2 border-b">
-                            {editedNotes[unitValue ?? ""] !== undefined ? editedNotes[unitValue ?? ""] : finalNote}
-                          </td>
-                        )}
-                      </tr>
-                    )
-                  })}
+                          return parts.length > 0 ? parts.join("; ") : "No Touch."
+                        })()}
+                      </td>
+                    )}
+                    {hasToilets && (
+                      <td className="py-2 px-2 border-b text-center">
+                        {(() => {
+                          if (unitColumn && editedInstallations[item[unitColumn] ?? ""]?.toilet !== undefined) {
+                            return editedInstallations[item[unitColumn] ?? ""]!.toilet
+                          }
+                          return item._toiletQuantity > 0 ? `0.8 GPF (${item._toiletQuantity})` : ""
+                        })()}
+                      </td>
+                    )}
+                    {hasNotes && (
+                      <td className="py-2 px-2 border-b">
+                        {editedNotes[item.Unit ?? ""] !== undefined
+                          ? editedNotes[item.Unit ?? ""]
+                          : item._consolidatedNotes}
+                      </td>
+                    )}
+                  </tr>
                 </tbody>
               </table>
             </div>
