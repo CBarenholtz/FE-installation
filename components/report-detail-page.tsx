@@ -281,49 +281,42 @@ export default function ReportDetailPage({
         supplyValue: quantityColumns.supply ? item[quantityColumns.supply] : "N/A",
       })
 
-      // Sum quantities from the correct quantity columns
+      // For each row of the same unit, increment count by 1 regardless of Excel values
       if (quantityColumns.toilet && item[quantityColumns.toilet]) {
-        const quantity = Number.parseInt(String(item[quantityColumns.toilet])) || 0
-        console.log(`Toilet quantity for ${unitKey}: ${item[quantityColumns.toilet]} -> ${quantity}`)
-        consolidatedData[unitKey].toiletCount += quantity
+        console.log(`Toilet row count for ${unitKey}: +1 (was ${item[quantityColumns.toilet]})`)
+        consolidatedData[unitKey].toiletCount += 1 // Always increment by 1 per row
       }
 
       if (quantityColumns.shower && item[quantityColumns.shower]) {
-        const quantity = Number.parseInt(String(item[quantityColumns.shower])) || 0
-        console.log(`Shower quantity for ${unitKey}: ${item[quantityColumns.shower]} -> ${quantity}`)
-        consolidatedData[unitKey].showerCount += quantity
+        console.log(`Shower row count for ${unitKey}: +1 (was ${item[quantityColumns.shower]})`)
+        consolidatedData[unitKey].showerCount += 1 // Always increment by 1 per row
       }
 
       if (quantityColumns.showerhead && item[quantityColumns.showerhead]) {
-        const quantity = Number.parseInt(String(item[quantityColumns.showerhead])) || 0
-        console.log(`Showerhead quantity for ${unitKey}: ${item[quantityColumns.showerhead]} -> ${quantity}`)
-        consolidatedData[unitKey].showerCount += quantity
+        console.log(`Showerhead row count for ${unitKey}: +1 (was ${item[quantityColumns.showerhead]})`)
+        consolidatedData[unitKey].showerCount += 1 // Always increment by 1 per row
       }
 
       if (quantityColumns.supply && item[quantityColumns.supply]) {
-        const quantity = Number.parseInt(String(item[quantityColumns.supply])) || 0
-        console.log(`Supply quantity for ${unitKey}: ${item[quantityColumns.supply]} -> ${quantity}`)
+        console.log(`Supply row count for ${unitKey}: +1 (was ${item[quantityColumns.supply]})`)
         // Supply lines typically correspond to kitchen/bathroom aerators
-        consolidatedData[unitKey].kitchenCount += quantity
-        consolidatedData[unitKey].bathroomCount += quantity
+        consolidatedData[unitKey].kitchenCount += 1 // Always increment by 1 per row
+        consolidatedData[unitKey].bathroomCount += 1 // Always increment by 1 per row
       }
 
       if (quantityColumns.ada && item[quantityColumns.ada]) {
-        const quantity = Number.parseInt(String(item[quantityColumns.ada])) || 0
-        console.log(`ADA quantity for ${unitKey}: ${item[quantityColumns.ada]} -> ${quantity}`)
-        consolidatedData[unitKey].showerCount += quantity
+        console.log(`ADA row count for ${unitKey}: +1 (was ${item[quantityColumns.ada]})`)
+        consolidatedData[unitKey].showerCount += 1 // Always increment by 1 per row
       }
 
       if (quantityColumns.kitchen && item[quantityColumns.kitchen]) {
-        const quantity = Number.parseInt(String(item[quantityColumns.kitchen])) || 0
-        console.log(`Kitchen quantity for ${unitKey}: ${item[quantityColumns.kitchen]} -> ${quantity}`)
-        consolidatedData[unitKey].kitchenCount += quantity
+        console.log(`Kitchen row count for ${unitKey}: +1 (was ${item[quantityColumns.kitchen]})`)
+        consolidatedData[unitKey].kitchenCount += 1 // Always increment by 1 per row
       }
 
       if (quantityColumns.bathroom && item[quantityColumns.bathroom]) {
-        const quantity = Number.parseInt(String(item[quantityColumns.bathroom])) || 0
-        console.log(`Bathroom quantity for ${unitKey}: ${item[quantityColumns.bathroom]} -> ${quantity}`)
-        consolidatedData[unitKey].bathroomCount += quantity
+        console.log(`Bathroom row count for ${unitKey}: +1 (was ${item[quantityColumns.bathroom]})`)
+        consolidatedData[unitKey].bathroomCount += 1 // Always increment by 1 per row
       }
 
       if (
@@ -339,19 +332,19 @@ export default function ReportDetailPage({
             // Try to infer what type of installation based on column name
             const lowerCol = numericCol.toLowerCase()
             if (lowerCol.includes("kitchen")) {
-              consolidatedData[unitKey].kitchenCount += quantity
+              consolidatedData[unitKey].kitchenCount += 1 // Always increment by 1 per row
             } else if (lowerCol.includes("bathroom") || lowerCol.includes("bath")) {
-              consolidatedData[unitKey].bathroomCount += quantity
+              consolidatedData[unitKey].bathroomCount += 1 // Always increment by 1 per row
             } else if (lowerCol.includes("shower")) {
-              consolidatedData[unitKey].showerCount += quantity
+              consolidatedData[unitKey].showerCount += 1 // Always increment by 1 per row
             } else if (lowerCol.includes("toilet")) {
-              consolidatedData[unitKey].toiletCount += quantity
+              consolidatedData[unitKey].toiletCount += 1 // Always increment by 1 per row
             } else {
               // Default: assume it's a general installation count
-              consolidatedData[unitKey].kitchenCount += quantity
-              consolidatedData[unitKey].bathroomCount += quantity
+              consolidatedData[unitKey].kitchenCount += 1 // Always increment by 1 per row
+              consolidatedData[unitKey].bathroomCount += 1 // Always increment by 1 per row
             }
-            console.log(`Inferred ${numericCol} quantity for ${unitKey}: ${quantity}`)
+            console.log(`Inferred ${numericCol} row count for ${unitKey}: +1`)
           }
         }
       }
