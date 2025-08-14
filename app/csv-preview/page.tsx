@@ -106,6 +106,24 @@ export default function CsvPreviewPage() {
           setSelectedUnitColumn(unitColumn)
         }
 
+        const autoSelectColumns = ["Tub Leak Description", "Kitch Sink", "Bath Sink"]
+        const foundColumns: string[] = []
+
+        autoSelectColumns.forEach((targetColumn) => {
+          const foundColumn = columns.find(
+            (col) =>
+              col.toLowerCase().includes(targetColumn.toLowerCase()) ||
+              targetColumn.toLowerCase().includes(col.toLowerCase()),
+          )
+          if (foundColumn) {
+            foundColumns.push(foundColumn)
+          }
+        })
+
+        if (foundColumns.length > 0) {
+          setSelectedNotesColumns(foundColumns)
+        }
+
         // Show all rows for preview
         setPreviewData(parsedRawData)
       }
