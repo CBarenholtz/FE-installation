@@ -518,64 +518,27 @@ interface ImageAnalysisResult {
 }
 
 async function analyzeImageWithGroq(imageDataUrl: string): Promise<ImageAnalysisResult> {
+  console.log("🤖 Client: Starting image analysis via API route...")
+
   try {
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    const response = await fetch("/api/analyze-image", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: "llama-3.2-90b-vision-preview",
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: 'Analyze this image and identify what bathroom fixture is shown. Respond with ONLY one of these exact words: "tub", "kitchen_sink", "bathroom_sink", or "unknown". Look for: bathtubs, shower areas, kitchen sinks, bathroom sinks, faucets, or plumbing fixtures.',
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: imageDataUrl,
-                },
-              },
-            ],
-          },
-        ],
-        max_tokens: 10,
-        temperature: 0.1,
-      }),
+      body: JSON.stringify({ imageDataUrl }),
     })
 
     if (!response.ok) {
-      throw new Error(`Groq API error: ${response.status}`)
+      const errorData = await response.json()
+      throw new Error(`API route error: ${errorData.error}`)
     }
 
-    const data: GroqVisionResponse = await response.json()
-    const content = data.choices[0]?.message?.content?.toLowerCase().trim()
-
-    console.log("🤖 Groq API response:", content)
-
-    // Parse the response
-    let fixtureType: ImageAnalysisResult["fixtureType"] = "unknown"
-    let confidence = 0.3
-
-    if (content?.includes("tub")) {
-      fixtureType = "tub"
-      confidence = 0.8
-    } else if (content?.includes("kitchen_sink")) {
-      fixtureType = "kitchen_sink"
-      confidence = 0.8
-    } else if (content?.includes("bathroom_sink")) {
-      fixtureType = "bathroom_sink"
-      confidence = 0.8
-    }
-
-    return { fixtureType, confidence }
+    const result: ImageAnalysisResult = await response.json()
+    console.log("🤖 Client: Analysis result:", result)
+    return result
   } catch (error) {
-    console.error("🤖 Error analyzing image with Groq:", error)
+    console.error("🤖 Client: Error calling analysis API:", error)
     return { fixtureType: "unknown", confidence: 0 }
   }
 }
@@ -585,18 +548,20 @@ export async function setCaptionsFromAIAnalysis(
   installationData: InstallationData[],
   notes: Note[],
 ): Promise<ImageData[]> {
-  console.log("🤖 Starting AI-powered caption analysis...")
-  console.log("- Images:", images.length)
-  console.log("- Installation data:", installationData.length)
+  console.log("🤖 ===== STARTING AI CAPTION ANALYSIS =====")
+  console.log("🤖 Images to process:", images.length)
+  console.log("🤖 Installation data entries:", installationData.length)
+  console.log("🤖 Environment check - GROQ_API_KEY exists:", !!process.env.GROQ_API_KEY)
 
   if (installationData.length === 0) {
-    console.log("No installation data available for AI analysis")
+    console.log("🤖 ERROR: No installation data available for AI analysis")
     return images
   }
 
   // Find leak columns
   const sampleData = installationData[0]
   const columns = Object.keys(sampleData)
+  console.log("🤖 Available columns:", columns)
 
   const tubLeakColumn =
     columns.find(
@@ -618,26 +583,35 @@ export async function setCaptionsFromAIAnalysis(
     ) || ""
 
   console.log("🤖 Found leak columns:")
-  console.log("- Tub Leak:", tubLeakColumn)
-  console.log("- Kitchen Sink:", kitchSinkColumn)
-  console.log("- Bath Sink:", bathSinkColumn)
+  console.log("🤖 - Tub Leak:", tubLeakColumn)
+  console.log("🤖 - Kitchen Sink:", kitchSinkColumn)
+  console.log("🤖 - Bath Sink:", bathSinkColumn)
 
   // Process images with AI analysis
   const updatedImages: ImageData[] = []
+  let processedCount = 0
 
   for (const image of images) {
+    processedCount++
+    console.log(`🤖 ===== PROCESSING IMAGE ${processedCount}/${images.length} =====`)
+    console.log(`🤖 Filename: ${image.filename}`)
+    console.log(`🤖 Unit: ${image.unit}`)
+    console.log(`🤖 Has URL: ${!!image.url}`)
+    console.log(`🤖 URL length: ${image.url?.length || 0}`)
+
     if (!image.url || !image.unit) {
-      console.log(`🤖 Skipping image ${image.filename} - missing URL or unit`)
+      console.log(`🤖 SKIPPING - Missing URL or unit`)
       updatedImages.push(image)
       continue
     }
 
     try {
-      console.log(`🤖 Analyzing image: ${image.filename}`)
+      console.log(`🤖 Starting AI analysis for ${image.filename}...`)
       const analysis = await analyzeImageWithGroq(image.url)
+      console.log(`🤖 AI analysis complete for ${image.filename}:`, analysis)
 
       if (analysis.confidence < 0.3) {
-        console.log(`🤖 Low confidence for ${image.filename}, using fallback`)
+        console.log(`🤖 Low confidence (${analysis.confidence}), using fallback`)
         updatedImages.push(
           setCaptionFromFallback(image, installationData, tubLeakColumn, kitchSinkColumn, bathSinkColumn),
         )
@@ -646,38 +620,48 @@ export async function setCaptionsFromAIAnalysis(
 
       const unitData = installationData.find((data) => data.Unit === image.unit)
       if (!unitData) {
-        console.log(`🤖 No unit data found for ${image.unit}`)
+        console.log(`🤖 ERROR: No unit data found for ${image.unit}`)
         updatedImages.push(image)
         continue
       }
 
+      console.log(`🤖 Unit data found for ${image.unit}`)
       let caption = ""
 
       // Map AI analysis to appropriate leak column
       switch (analysis.fixtureType) {
         case "tub":
+          console.log(`🤖 Processing TUB detection...`)
           if (tubLeakColumn && unitData[tubLeakColumn] && unitData[tubLeakColumn].trim()) {
             const severity = unitData[tubLeakColumn].trim()
             caption = `${severity} leak from tub spout.`
-            console.log(`🤖 AI detected tub, assigned caption: "${caption}"`)
+            console.log(`🤖 SUCCESS: Tub caption assigned: "${caption}"`)
+          } else {
+            console.log(`🤖 No tub leak data available for unit ${image.unit}`)
           }
           break
         case "kitchen_sink":
+          console.log(`🤖 Processing KITCHEN SINK detection...`)
           if (kitchSinkColumn && unitData[kitchSinkColumn] && unitData[kitchSinkColumn].trim()) {
             const severity = unitData[kitchSinkColumn].trim()
             caption = `${severity} drip from kitchen faucet.`
-            console.log(`🤖 AI detected kitchen sink, assigned caption: "${caption}"`)
+            console.log(`🤖 SUCCESS: Kitchen caption assigned: "${caption}"`)
+          } else {
+            console.log(`🤖 No kitchen sink data available for unit ${image.unit}`)
           }
           break
         case "bathroom_sink":
+          console.log(`🤖 Processing BATHROOM SINK detection...`)
           if (bathSinkColumn && unitData[bathSinkColumn] && unitData[bathSinkColumn].trim()) {
             const severity = unitData[bathSinkColumn].trim()
             caption = `${severity} drip from bathroom faucet.`
-            console.log(`🤖 AI detected bathroom sink, assigned caption: "${caption}"`)
+            console.log(`🤖 SUCCESS: Bathroom caption assigned: "${caption}"`)
+          } else {
+            console.log(`🤖 No bathroom sink data available for unit ${image.unit}`)
           }
           break
         default:
-          console.log(`🤖 AI detected "${analysis.fixtureType}" with low confidence, using fallback`)
+          console.log(`🤖 Unknown fixture type: ${analysis.fixtureType}, using fallback`)
           updatedImages.push(
             setCaptionFromFallback(image, installationData, tubLeakColumn, kitchSinkColumn, bathSinkColumn),
           )
@@ -685,26 +669,30 @@ export async function setCaptionsFromAIAnalysis(
       }
 
       if (!caption) {
-        console.log(`🤖 No matching leak data for detected fixture type: ${analysis.fixtureType}`)
+        console.log(`🤖 No caption generated, using fallback for ${analysis.fixtureType}`)
         updatedImages.push(
           setCaptionFromFallback(image, installationData, tubLeakColumn, kitchSinkColumn, bathSinkColumn),
         )
         continue
       }
 
+      console.log(`🤖 FINAL CAPTION: "${caption}"`)
       updatedImages.push({
         ...image,
         caption: caption,
       })
     } catch (error) {
-      console.error(`🤖 Error analyzing ${image.filename}:`, error)
+      console.error(`🤖 CRITICAL ERROR processing ${image.filename}:`, error)
+      console.error(`🤖 Error details:`, error instanceof Error ? error.message : "Unknown error")
       updatedImages.push(
         setCaptionFromFallback(image, installationData, tubLeakColumn, kitchSinkColumn, bathSinkColumn),
       )
     }
   }
 
-  console.log("🤖 AI caption analysis complete!")
+  console.log("🤖 ===== AI CAPTION ANALYSIS COMPLETE =====")
+  console.log(`🤖 Processed ${processedCount} images`)
+  console.log(`🤖 Updated images count: ${updatedImages.length}`)
   return updatedImages
 }
 
