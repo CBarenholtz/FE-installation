@@ -119,7 +119,32 @@ export default function ImageUpload({
   }
 
   const handleAutoSuggestCaptions = () => {
+    console.log("Auto-suggest captions clicked")
+    console.log("Images:", images.length)
+    console.log("Installation data:", installationData.length)
+    console.log("Notes:", notes.length)
+
+    // Log sample data to understand structure
+    if (images.length > 0) {
+      console.log("Sample image:", images[0])
+    }
+    if (installationData.length > 0) {
+      console.log("Sample installation data:", installationData[0])
+    }
+    if (notes.length > 0) {
+      console.log("Sample note:", notes[0])
+    }
+
     const captionedImages = setCaptionsFromUnitNotes(images, installationData, notes)
+    console.log("Captioned images result:", captionedImages.length)
+
+    // Log changes made
+    const changedImages = captionedImages.filter((img, index) => img.caption !== images[index].caption)
+    console.log("Images with changed captions:", changedImages.length)
+    changedImages.forEach((img) => {
+      console.log(`Unit ${img.unit}: "${img.caption}"`)
+    })
+
     setImages(captionedImages)
     onImagesUploaded(captionedImages)
   }

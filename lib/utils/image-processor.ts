@@ -142,8 +142,8 @@ export function matchImageWithNotes(
             captionText = "Heavy tub spout leak"
             break
           default:
-            noteText = "Leak from tub spout/diverter"
-            captionText = "Tub spout leak"
+            if (leakValue) noteText = "Leak from tub spout/diverter"
+            break
         }
 
         matchedNotes.push(noteText)
@@ -366,20 +366,32 @@ export function setCaptionsFromUnitNotes(
   installationData: InstallationData[],
   notes: Note[],
 ): ImageData[] {
+  console.log("setCaptionsFromUnitNotes called with:")
+  console.log("- Images:", images.length)
+  console.log("- Installation data:", installationData.length)
+  console.log("- Notes:", notes.length)
+
   return images.map((image) => {
+    console.log(`Processing image for unit ${image.unit}`)
+
     // Find the unit's notes
     const unitData = installationData.find((data) => data.Unit === image.unit)
     const unitNotes = notes.filter((note) => note.unit === image.unit)
+
+    console.log(`Unit ${image.unit} - Found unit data:`, !!unitData)
+    console.log(`Unit ${image.unit} - Found unit notes:`, unitNotes.length)
 
     let caption = ""
 
     // Priority 1: Use unit notes from the notes array
     if (unitNotes.length > 0) {
       caption = unitNotes[0].note // Use the first note for this unit
+      console.log(`Unit ${image.unit} - Using unit note: "${caption}"`)
     }
     // Priority 2: Use general notes from installation data
     else if (unitData?.Notes && unitData.Notes.trim()) {
       caption = unitData.Notes.trim()
+      console.log(`Unit ${image.unit} - Using general notes: "${caption}"`)
     }
     // Priority 3: Use leak issue notes
     else if (unitData) {
@@ -448,12 +460,18 @@ export function setCaptionsFromUnitNotes(
       }
 
       caption = leakNotes.join(". ")
+      if (caption) {
+        console.log(`Unit ${image.unit} - Using leak issue notes: "${caption}"`)
+      }
     }
 
     // Priority 4: Keep existing caption if no notes found
     if (!caption) {
       caption = image.caption || `Unit ${image.unit} installation photo`
+      console.log(`Unit ${image.unit} - Using fallback caption: "${caption}"`)
     }
+
+    console.log(`Unit ${image.unit} - Final caption: "${caption}"`)
 
     return {
       ...image,
