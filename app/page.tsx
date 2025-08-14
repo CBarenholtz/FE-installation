@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useRouter } from "next/navigation"
-import { ChevronLeft, Upload } from "lucide-react"
+import { ChevronLeft, Upload, FileText, Save } from "lucide-react"
 import ReportCoverPage from "@/components/report-cover-page"
 import ReportLetterPage from "@/components/report-letter-page"
 import ReportNotesPage from "@/components/report-notes-page"
@@ -20,6 +20,7 @@ import ImageUpload from "@/components/image-upload"
 import ReportPicturesPage from "@/components/report-pictures-page"
 import { ReportProvider, useReportContext } from "@/lib/report-context"
 import { parseExcelFile } from "@/lib/excel-parser"
+import { ReportManager } from "@/lib/report-manager"
 import type { CustomerInfo, InstallationData, Note, ImageData } from "@/lib/types"
 
 function UploadForm() {
@@ -109,7 +110,13 @@ function UploadForm() {
     <div className="container mx-auto px-4 py-8">
       <Card>
         <CardContent className="pt-6">
-          <h1 className="text-2xl font-bold mb-6">Water Installation Report Generator</h1>
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-2xl font-bold">Water Installation Report Generator</h1>
+            <Button variant="outline" onClick={() => router.push("/my-reports")} className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              My Reports
+            </Button>
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Customer Information */}
@@ -247,6 +254,7 @@ function ReportView({
   notes: Note[]
   onBack: () => void
 }) {
+  const router = useRouter()
   const [currentPage, setCurrentPage] = useState("cover")
   const [images, setImages] = useState<ImageData[]>([])
 
@@ -266,14 +274,54 @@ function ReportView({
     localStorage.setItem("reportImages", JSON.stringify(uploadedImages))
   }
 
+  const handleSaveReport = () => {
+    try {
+      const reportId = ReportManager.saveCurrentReport()
+      alert(`Report saved successfully! You can find it in "My Reports".`)
+    } catch (error) {
+      console.error("Error saving report:", error)
+      alert("Error saving report. Please try again.")
+    }
+  }
+
+  const handleBackWithSaveOption = () => {
+    if (ReportManager.hasUnsavedWork()) {
+      const shouldSave = confirm(
+        "You have unsaved work. Would you like to save this report before going back?\n\nClick OK to save, or Cancel to discard changes.",
+      )
+
+      if (shouldSave) {
+        try {
+          const reportId = ReportManager.saveCurrentReport()
+          alert("Report saved successfully!")
+        } catch (error) {
+          console.error("Error saving report:", error)
+          alert("Error saving report, but continuing anyway.")
+        }
+      }
+    }
+
+    onBack()
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-8 print:hidden">
-        <Button variant="outline" onClick={onBack}>
-          <ChevronLeft className="mr-2 h-4 w-4" />
-          Back to Form
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleBackWithSaveOption}>
+            <ChevronLeft className="mr-2 h-4 w-4" />
+            Back to Form
+          </Button>
+          <Button variant="outline" onClick={() => router.push("/my-reports")}>
+            <FileText className="mr-2 h-4 w-4" />
+            My Reports
+          </Button>
+        </div>
         <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={handleSaveReport}>
+            <Save className="mr-2 h-4 w-4" />
+            Save Report
+          </Button>
           <ExcelExportButton
             customerInfo={customerInfo}
             installationData={installationData}
