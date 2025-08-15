@@ -1,14 +1,25 @@
-import { list } from "@vercel/blob"
 import { NextResponse } from "next/server"
 
 export async function GET() {
   try {
-    const { blobs } = await list()
+    const response = await fetch("https://blob.vercel-storage.com/", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}`,
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to list blobs: ${response.statusText}`)
+    }
+
+    const data = await response.json()
+    const blobs = data.blobs || []
 
     // Filter for JSON report files and extract metadata
     const reportFiles = blobs
-      .filter((blob) => blob.pathname.endsWith(".json"))
-      .map((blob) => {
+      .filter((blob: any) => blob.pathname.endsWith(".json"))
+      .map((blob: any) => {
         const filename = blob.pathname.split("/").pop() || "unknown"
 
         // Parse filename: timestamp_propertyname.json
@@ -26,7 +37,7 @@ export async function GET() {
         }
       })
       // Sort by timestamp (most recent first)
-      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       // Limit to 15 most recent
       .slice(0, 15)
 
