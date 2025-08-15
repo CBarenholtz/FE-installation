@@ -1,9 +1,10 @@
-import { list } from "@vercel/blob"
 import { NextResponse } from "next/server"
 
 export async function GET() {
   try {
     console.log("[v0] List route called")
+
+    const { list } = await import("@vercel/blob")
 
     const { blobs } = await list()
 
