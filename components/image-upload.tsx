@@ -2,573 +2,327 @@
 
 import type React from "react"
 
-import { useEffect, useState, useCallback } from "react"
+import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useRouter } from "next/navigation"
-import { ChevronLeft, Upload, FileText, Save } from "lucide-react"
-import ReportCoverPage from "@/components/report-cover-page"
-import ReportLetterPage from "@/components/report-letter-page"
-import ReportNotesPage from "@/components/report-notes-page"
-import ReportDetailPage from "@/components/report-detail-page"
-import EnhancedPdfButton from "@/components/enhanced-pdf-button"
-import ExcelExportButton from "@/components/excel-export-button"
-import ImageUpload from "@/components/image-upload"
-import ReportPicturesPage from "@/components/report-pictures-page"
-import { ReportProvider, useReportContext } from "@/lib/report-context"
-import { parseExcelFile } from "@/lib/excel-parser"
-import { ReportManager } from "@/lib/report-manager"
-import type { CustomerInfo, InstallationData, Note, ImageData } from "@/lib/types"
+import { Upload, Link, X, ImageIcon, Wand2 } from "lucide-react"
+import type { ImageData, InstallationData, Note } from "@/lib/types"
+import { extractUnitFromFilename, setCaptionsFromUnitNotes } from "@/lib/utils/image-processor"
+import JSZip from "jszip"
 
-function UploadForm() {
-  const router = useRouter()
-  const [file, setFile] = useState<File | null>(null)
-  const [customerInfo, setCustomerInfo] = useState({
-    customerName: "",
-    propertyName: "",
-    address: "",
-    city: "",
-    state: "",
-    zip: "",
-    unitType: "Unit" as "Unit" | "Room",
-  })
-  const [coverImage, setCoverImage] = useState<File | null>(null)
+interface ImageUploadProps {
+  onImagesUploaded: (images: ImageData[]) => void
+  existingImages?: ImageData[]
+  installationData?: InstallationData[]
+  notes?: Note[]
+}
+
+export default function ImageUpload({
+  onImagesUploaded,
+  existingImages = [],
+  installationData = [],
+  notes = [],
+}: ImageUploadProps) {
+  const [images, setImages] = useState<ImageData[]>(existingImages)
+  const [googleDriveLinks, setGoogleDriveLinks] = useState("")
   const [isProcessing, setIsProcessing] = useState(false)
+  const [uploadMethod, setUploadMethod] = useState<"zip" | "googledrive">("zip")
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0]
-    if (selectedFile) {
-      setFile(selectedFile)
-    }
+  const convertToDataURL = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
   }
 
-  const handleCoverImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0]
-    if (selectedFile) {
-      setCoverImage(selectedFile)
-    }
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!file) {
-      alert("Please select a file to upload")
+  // Handle zip file upload and extract images with improved unit detection
+  const handleZipUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file || !file.name.endsWith(".zip")) {
+      alert("Please select a valid ZIP file")
       return
     }
 
-    if (!customerInfo.customerName || !customerInfo.propertyName || !customerInfo.address) {
-      alert("Please fill in all required customer information fields")
+    setIsProcessing(true)
+    try {
+      const zip = new JSZip()
+      const zipContent = await zip.loadAsync(file)
+      const newImages: ImageData[] = []
+
+      for (const [filename, zipEntry] of Object.entries(zipContent.files)) {
+        if (!zipEntry.dir && /\.(jpg|jpeg|png|gif|webp)$/i.test(filename)) {
+          const imageBlob = await zipEntry.async("blob")
+          const imageFile = new File([imageBlob], filename, { type: imageBlob.type })
+
+          const imageUrl = await convertToDataURL(imageFile)
+
+          // Use improved unit extraction
+          const unit = extractUnitFromFilename(filename)
+
+          newImages.push({
+            id: `zip_${Date.now()}_${Math.random()}`,
+            file: imageFile,
+            url: imageUrl, // Now using data URL instead of blob URL
+            caption: "",
+            unit: unit,
+            filename: filename,
+          })
+        }
+      }
+
+      const updatedImages = [...images, ...newImages]
+      setImages(updatedImages)
+      onImagesUploaded(updatedImages)
+    } catch (error) {
+      console.error("Error processing ZIP file:", error)
+      alert("Error processing ZIP file. Please try again.")
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const handleGoogleDriveLinks = () => {
+    const links = googleDriveLinks.split("\n").filter((link) => link.trim())
+    const newImages: ImageData[] = []
+
+    links.forEach((link) => {
+      const trimmedLink = link.trim()
+      if (trimmedLink) {
+        let fileId = ""
+        let filename = "google_drive_image"
+
+        if (trimmedLink.includes("drive.google.com")) {
+          const idMatch = trimmedLink.match(/\/d\/([a-zA-Z0-9-_]+)/)
+          if (idMatch) {
+            fileId = idMatch[1]
+            filename = `gdrive_${fileId}`
+          }
+        } else if (trimmedLink.match(/^[a-zA-Z0-9-_]+$/)) {
+          fileId = trimmedLink
+          filename = `gdrive_${fileId}`
+        }
+
+        if (fileId) {
+          const imageUrl = `https://drive.google.com/uc?id=${fileId}`
+          newImages.push({
+            id: `gdrive_${Date.now()}_${Math.random()}`,
+            file: null,
+            url: imageUrl,
+            caption: "",
+            unit: "",
+            filename: filename,
+            googleDriveId: fileId,
+          })
+        }
+      }
+    })
+
+    const updatedImages = [...images, ...newImages]
+    setImages(updatedImages)
+    onImagesUploaded(updatedImages)
+    setGoogleDriveLinks("")
+  }
+
+  const handleAutoSuggestCaptions = async () => {
+    console.log("🔥 Auto-suggest captions clicked")
+    console.log("Images:", images.length)
+    console.log("Installation data:", installationData.length)
+    console.log("Notes:", notes.length)
+
+    if (images.length === 0) {
+      alert("No images to process")
+      return
+    }
+
+    if (installationData.length === 0) {
+      alert("No installation data available for caption generation")
       return
     }
 
     setIsProcessing(true)
 
     try {
-      // Parse the Excel file
-      const installationData = await parseExcelFile(file)
+      const captionedImages = setCaptionsFromUnitNotes(images, installationData, notes)
 
-      if (installationData.length === 0) {
-        alert("No valid installation data found in the file")
-        setIsProcessing(false)
-        return
-      }
+      console.log("🔥 Caption generation complete!")
 
-      // Store raw data and customer info
-      localStorage.setItem("rawInstallationData", JSON.stringify(installationData))
-      localStorage.setItem(
-        "customerInfo",
-        JSON.stringify({
-          ...customerInfo,
-          date: new Date().toLocaleDateString(),
-        }),
-      )
+      // Log changes made
+      const changedImages = captionedImages.filter((img, index) => img.caption !== images[index].caption)
+      console.log("Images with generated captions:", changedImages.length)
+      changedImages.forEach((img) => {
+        console.log(`Unit ${img.unit}: "${img.caption}"`)
+      })
 
-      // Handle cover image if provided
-      if (coverImage) {
-        const reader = new FileReader()
-        reader.onload = (e) => {
-          const imageData = e.target?.result as string
-          localStorage.setItem("coverImage", imageData)
-          router.push("/csv-preview")
-        }
-        reader.readAsDataURL(coverImage)
+      setImages(captionedImages)
+      onImagesUploaded(captionedImages)
+
+      if (changedImages.length > 0) {
+        alert(`Caption generation complete! Generated captions for ${changedImages.length} images.`)
       } else {
-        router.push("/csv-preview")
+        alert("Caption generation complete! No new captions were generated.")
       }
     } catch (error) {
-      console.error("Error processing file:", error)
-      alert("Error processing file. Please check the file format and try again.")
+      console.error("🔥 Error in caption generation:", error)
+      alert("Error generating captions. Please try again.")
+    } finally {
       setIsProcessing(false)
     }
   }
 
+  const updateImage = (id: string, updates: Partial<ImageData>) => {
+    const updatedImages = images.map((img) => (img.id === id ? { ...img, ...updates } : img))
+    setImages(updatedImages)
+    onImagesUploaded(updatedImages)
+  }
+
+  const removeImage = (id: string) => {
+    const updatedImages = images.filter((img) => img.id !== id)
+    setImages(updatedImages)
+    onImagesUploaded(updatedImages)
+  }
+
   return (
-    <div className="container mx-auto px-4 py-8">
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-bold">Water Installation Report Generator</h1>
-            <Button variant="outline" onClick={() => router.push("/my-reports")} className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              My Reports
+    <Card className="w-full">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <ImageIcon className="h-5 w-5" />
+          Upload Pictures for Report
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div className="flex gap-2 mb-4">
+            <Button
+              variant={uploadMethod === "zip" ? "default" : "outline"}
+              onClick={() => setUploadMethod("zip")}
+              size="sm"
+            >
+              ZIP File Upload
+            </Button>
+            <Button
+              variant={uploadMethod === "googledrive" ? "default" : "outline"}
+              onClick={() => setUploadMethod("googledrive")}
+              size="sm"
+            >
+              Google Drive Links
             </Button>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Customer Information */}
-            <div className="space-y-4">
-              <h2 className="text-lg font-semibold">Customer Information</h2>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="customerName">Customer Name *</Label>
-                  <Input
-                    id="customerName"
-                    value={customerInfo.customerName}
-                    onChange={(e) => setCustomerInfo((prev) => ({ ...prev, customerName: e.target.value }))}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="propertyName">Property Name *</Label>
-                  <Input
-                    id="propertyName"
-                    value={customerInfo.propertyName}
-                    onChange={(e) => setCustomerInfo((prev) => ({ ...prev, propertyName: e.target.value }))}
-                    required
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <Label htmlFor="address">Address *</Label>
-                  <Input
-                    id="address"
-                    value={customerInfo.address}
-                    onChange={(e) => setCustomerInfo((prev) => ({ ...prev, address: e.target.value }))}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="city">City</Label>
-                  <Input
-                    id="city"
-                    value={customerInfo.city}
-                    onChange={(e) => setCustomerInfo((prev) => ({ ...prev, city: e.target.value }))}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="state">State</Label>
-                  <Input
-                    id="state"
-                    value={customerInfo.state}
-                    onChange={(e) => setCustomerInfo((prev) => ({ ...prev, state: e.target.value }))}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="zip">ZIP Code</Label>
-                  <Input
-                    id="zip"
-                    value={customerInfo.zip}
-                    onChange={(e) => setCustomerInfo((prev) => ({ ...prev, zip: e.target.value }))}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="unitType">Unit Type</Label>
-                  <select
-                    id="unitType"
-                    value={customerInfo.unitType}
-                    onChange={(e) =>
-                      setCustomerInfo((prev) => ({ ...prev, unitType: e.target.value as "Unit" | "Room" }))
-                    }
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                  >
-                    <option value="Unit">Unit</option>
-                    <option value="Room">Room</option>
-                  </select>
-                </div>
+          {uploadMethod === "zip" && (
+            <div className="space-y-2">
+              <Label htmlFor="zip-upload">Upload ZIP file containing images</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="zip-upload"
+                  type="file"
+                  accept=".zip"
+                  ref={fileInputRef}
+                  onChange={handleZipUpload}
+                  disabled={isProcessing}
+                />
+                <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isProcessing}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  {isProcessing ? "Processing..." : "Browse"}
+                </Button>
               </div>
+              <p className="text-sm text-muted-foreground">
+                Name your images with unit numbers (e.g., "A01_leak.jpg") for automatic unit matching
+              </p>
             </div>
+          )}
 
-            {/* Cover Image Upload */}
-            <div>
-              <Label htmlFor="coverImage">Cover Image (Optional)</Label>
-              <Input id="coverImage" type="file" accept="image/*" onChange={handleCoverImageChange} />
-            </div>
-
-            {/* File Upload */}
-            <div>
-              <Label htmlFor="file">Excel/CSV File *</Label>
-              <Input id="file" type="file" accept=".csv,.xlsx,.xls" onChange={handleFileChange} required />
-            </div>
-
-            <Button type="submit" disabled={isProcessing} className="w-full">
-              {isProcessing ? (
-                <>Processing...</>
-              ) : (
-                <>
-                  <Upload className="mr-2 h-4 w-4" />
-                  Generate Report
-                </>
-              )}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
-
-// Loading component - separate component for loading state
-function LoadingState() {
-  return (
-    <div className="flex items-center justify-center h-screen">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-    </div>
-  )
-}
-
-function NoDataState({ onBack }: { onBack: () => void }) {
-  return <UploadForm />
-}
-
-// Report view component - separate component for the actual report
-function ReportView({
-  customerInfo,
-  installationData,
-  toiletCount,
-  notes,
-  onBack,
-}: {
-  customerInfo: CustomerInfo
-  installationData: InstallationData[]
-  toiletCount: number
-  notes: Note[]
-  onBack: () => void
-}) {
-  const router = useRouter()
-  const [currentPage, setCurrentPage] = useState("cover")
-  const [images, setImages] = useState<ImageData[]>([])
-
-  useEffect(() => {
-    const storedImages = localStorage.getItem("reportImages")
-    if (storedImages) {
-      try {
-        setImages(JSON.parse(storedImages))
-      } catch (error) {
-        console.error("Error loading images:", error)
-      }
-    }
-  }, [])
-
-  const handleImagesUploaded = (uploadedImages: ImageData[]) => {
-    setImages(uploadedImages)
-    localStorage.setItem("reportImages", JSON.stringify(uploadedImages))
-  }
-
-  const handleSaveReport = () => {
-    try {
-      const reportId = ReportManager.saveCurrentReport()
-      alert(`Report saved successfully! You can find it in "My Reports".`)
-    } catch (error) {
-      console.error("Error saving report:", error)
-      alert("Error saving report. Please try again.")
-    }
-  }
-
-  const handleBackWithSaveOption = () => {
-    if (ReportManager.hasUnsavedWork()) {
-      const shouldSave = confirm(
-        "You have unsaved work. Would you like to save this report before going back?\n\nClick OK to save, or Cancel to discard changes.",
-      )
-
-      if (shouldSave) {
-        try {
-          const reportId = ReportManager.saveCurrentReport()
-          alert("Report saved successfully!")
-        } catch (error) {
-          console.error("Error saving report:", error)
-          alert("Error saving report, but continuing anyway.")
-        }
-      }
-    }
-
-    onBack()
-  }
-
-  return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-8 print:hidden">
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={handleBackWithSaveOption}>
-            <ChevronLeft className="mr-2 h-4 w-4" />
-            Back to Form
-          </Button>
-          <Button variant="outline" onClick={() => router.push("/my-reports")}>
-            <FileText className="mr-2 h-4 w-4" />
-            My Reports
-          </Button>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={handleSaveReport}>
-            <Save className="mr-2 h-4 w-4" />
-            Save Report
-          </Button>
-          <ExcelExportButton
-            customerInfo={customerInfo}
-            installationData={installationData}
-            toiletCount={toiletCount}
-            notes={notes}
-          />
-          <EnhancedPdfButton
-            customerInfo={customerInfo}
-            installationData={installationData}
-            toiletCount={toiletCount}
-            notes={notes}
-          />
-        </div>
-      </div>
-
-      <div className="print:hidden">
-        <Tabs value={currentPage} onValueChange={setCurrentPage}>
-          <TabsList className="grid grid-cols-5">
-            <TabsTrigger value="cover">Cover Page</TabsTrigger>
-            <TabsTrigger value="letter">Letter Page</TabsTrigger>
-            <TabsTrigger value="notes">Notes Pages</TabsTrigger>
-            <TabsTrigger value="details">Detail Pages</TabsTrigger>
-            <TabsTrigger value="pictures">Pictures</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="cover">
-            <ReportCoverPage customerInfo={customerInfo} isEditable={true} />
-          </TabsContent>
-
-          <TabsContent value="letter">
-            <ReportLetterPage customerInfo={customerInfo} toiletCount={toiletCount} isEditable={true} />
-          </TabsContent>
-
-          <TabsContent value="notes">
-            <ReportNotesPage notes={notes} isPreview={true} isEditable={true} />
-          </TabsContent>
-
-          <TabsContent value="details">
-            <ReportDetailPage installationData={installationData} isPreview={true} isEditable={true} />
-          </TabsContent>
-
-          <TabsContent value="pictures">
-            <div className="space-y-6">
-              <ImageUpload
-                onImagesUploaded={handleImagesUploaded}
-                existingImages={images}
-                installationData={installationData}
-                notes={notes}
+          {uploadMethod === "googledrive" && (
+            <div className="space-y-2">
+              <Label htmlFor="gdrive-links">Google Drive Links or File IDs</Label>
+              <textarea
+                id="gdrive-links"
+                className="w-full h-32 p-2 border rounded-md resize-none"
+                placeholder="Paste Google Drive links or file IDs (one per line)&#10;https://drive.google.com/file/d/1ABC123.../view&#10;or just: 1ABC123..."
+                value={googleDriveLinks}
+                onChange={(e) => setGoogleDriveLinks(e.target.value)}
               />
+              <Button onClick={handleGoogleDriveLinks} disabled={!googleDriveLinks.trim()}>
+                <Link className="h-4 w-4 mr-2" />
+                Add Images
+              </Button>
+            </div>
+          )}
+        </div>
 
-              {images.length > 0 && (
-                <div className="border-t pt-6">
-                  <h3 className="text-lg font-semibold mb-4">Pictures Report Preview</h3>
-                  <ReportPicturesPage isPreview={true} isEditable={true} />
-                </div>
+        {/* Display uploaded images with editing capabilities */}
+        {images.length > 0 && (
+          <div className="mt-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Uploaded Images ({images.length})</h3>
+              {installationData.length > 0 && (
+                <Button variant="outline" size="sm" onClick={handleAutoSuggestCaptions} disabled={isProcessing}>
+                  <Wand2 className="h-4 w-4 mr-2" />
+                  {isProcessing ? "Generating..." : "Auto-Suggest Captions"}
+                </Button>
               )}
             </div>
-          </TabsContent>
-        </Tabs>
-      </div>
 
-      {/* Hidden content for printing - using the same components as the preview but with editing disabled */}
-      <div className="hidden print-content">
-        <div className="report-page">
-          <ReportCoverPage customerInfo={customerInfo} isEditable={false} />
-        </div>
-        <div className="page-break"></div>
-        <div className="report-page">
-          <ReportLetterPage customerInfo={customerInfo} toiletCount={toiletCount} isEditable={false} />
-        </div>
-        <div className="page-break"></div>
-        <ReportNotesPage notes={notes} isPreview={false} isEditable={false} />
-        <div className="page-break"></div>
-        <ReportDetailPage installationData={installationData} isPreview={false} isEditable={false} />
-        <div className="page-break"></div>
-        <ReportPicturesPage isPreview={false} isEditable={false} />
-      </div>
-    </div>
-  )
-}
-
-// Main content component
-function ReportContent() {
-  const router = useRouter()
-  const { customerInfo, toiletCount, setToiletCount, notes, setNotes } = useReportContext()
-
-  const [installationData, setInstallationData] = useState<InstallationData[]>([])
-  const [loading, setLoading] = useState(true)
-  const [csvSchema, setCsvSchema] = useState<any[]>([])
-  const [filteredData, setFilteredData] = useState<InstallationData[]>([])
-  const [reportNotes, setReportNotes] = useState<Note[]>([])
-
-  const handleBack = () => {
-    try {
-      console.log("[v0] Starting handleBack - clearing localStorage")
-
-      // Clear all localStorage items with individual error handling
-      const itemsToRemove = [
-        "installationData",
-        "toiletCount",
-        "customerInfo",
-        "rawInstallationData",
-        "coverImage",
-        "reportImages",
-        "selectedCells",
-        "selectedNotesColumns",
-        // Additional items that might exist
-        "reportNotes",
-        "reportTitle",
-        "letterText",
-        "signatureName",
-        "signatureTitle",
-        "editedUnits",
-      ]
-
-      itemsToRemove.forEach((item) => {
-        try {
-          localStorage.removeItem(item)
-        } catch (error) {
-          console.error(`[v0] Error removing ${item} from localStorage:`, error)
-        }
-      })
-
-      // Clear component state
-      setInstallationData([])
-      setFilteredData([])
-      setReportNotes([])
-      setLoading(true)
-
-      console.log("[v0] localStorage cleared, reloading data")
-
-      // Use direct call instead of setTimeout to avoid race conditions
-      loadData()
-    } catch (error) {
-      console.error("[v0] Error in handleBack:", error)
-      // Fallback: try to reload the page if localStorage operations fail
-      try {
-        window.location.reload()
-      } catch (reloadError) {
-        console.error("[v0] Error reloading page:", reloadError)
-        // Last resort: navigate to home
-        router.push("/")
-      }
-    }
-  }
-
-  // Load data from localStorage
-  const loadData = useCallback(() => {
-    try {
-      console.log("[v0] Loading data from localStorage")
-      const storedInstallationData = localStorage.getItem("installationData")
-      const storedToiletCount = localStorage.getItem("toiletCount")
-
-      if (storedInstallationData && storedToiletCount) {
-        const parsedInstallationData = JSON.parse(storedInstallationData)
-        const parsedToiletCount = JSON.parse(storedToiletCount)
-
-        setInstallationData(parsedInstallationData)
-        setToiletCount(parsedToiletCount)
-
-        if (parsedInstallationData && parsedInstallationData.length > 0) {
-          const firstItem = parsedInstallationData[0]
-          const schema = Object.keys(firstItem).map((key) => ({
-            name: key,
-            type: typeof firstItem[key],
-            exampleValue: firstItem[key],
-          }))
-          setCsvSchema(schema)
-        }
-
-        setFilteredData(parsedInstallationData)
-
-        const notes = parsedInstallationData
-          .filter(
-            (item: InstallationData) =>
-              item["Leak Issue Kitchen Faucet"] ||
-              item["Leak Issue Bath Faucet"] ||
-              item["Tub Spout/Diverter Leak Issue"] ||
-              (item.Notes && item.Notes.trim() !== ""),
-          )
-          .map((item: InstallationData) => {
-            let noteText = ""
-            if (item["Leak Issue Kitchen Faucet"]) noteText += "Dripping from kitchen faucet. "
-            if (item["Leak Issue Bath Faucet"]) noteText += "Dripping from bathroom faucet. "
-            if (item["Tub Spout/Diverter Leak Issue"] === "Light") noteText += "Light leak from tub spout/ diverter. "
-            if (item["Tub Spout/Diverter Leak Issue"] === "Moderate")
-              noteText += "Moderate leak from tub spout/diverter. "
-            if (item["Tub Spout/Diverter Leak Issue"] === "Heavy") noteText += "Heavy leak from tub spout/ diverter. "
-
-            if (item.Notes && item.Notes.trim() !== "") {
-              noteText += item.Notes + " "
-            }
-
-            return {
-              unit: item.Unit,
-              note: noteText.trim(),
-            }
-          })
-          .filter((note: Note) => note.note !== "")
-
-        console.log("Report: Generated notes from installation data:", notes)
-        setReportNotes(notes)
-      }
-    } catch (error) {
-      console.error("[v0] Error loading data:", error)
-      // If data loading fails, ensure we're in a clean state
-      setInstallationData([])
-      setFilteredData([])
-      setReportNotes([])
-    } finally {
-      setLoading(false)
-    }
-  }, [setToiletCount])
-
-  useEffect(() => {
-    loadData()
-  }, [loadData])
-
-  useEffect(() => {
-    if (JSON.stringify(reportNotes) !== JSON.stringify(notes)) {
-      setNotes(reportNotes)
-    }
-  }, [reportNotes, notes, setNotes])
-
-  if (loading) {
-    return <LoadingState />
-  }
-
-  if (!customerInfo || installationData.length === 0) {
-    return <NoDataState onBack={handleBack} />
-  }
-
-  return (
-    <ReportView
-      customerInfo={customerInfo}
-      installationData={filteredData}
-      toiletCount={toiletCount}
-      notes={notes}
-      onBack={handleBack}
-    />
-  )
-}
-
-export default function ReportPage() {
-  return (
-    <ReportProvider>
-      <ReportContent />
-    </ReportProvider>
+            <div className="grid gap-4">
+              {images.map((image) => (
+                <Card key={image.id} className="p-4">
+                  <div className="flex gap-4">
+                    <div className="flex-shrink-0">
+                      <img
+                        src={image.url || "/placeholder.svg"}
+                        alt={image.filename}
+                        className="w-24 h-24 object-cover rounded border"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement
+                          target.src = "/placeholder.svg?key=pdmsa"
+                        }}
+                      />
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-sm">{image.filename}</span>
+                        <Button variant="ghost" size="sm" onClick={() => removeImage(image.id)}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <Label htmlFor={`unit-${image.id}`} className="text-xs">
+                            Unit
+                          </Label>
+                          <Input
+                            id={`unit-${image.id}`}
+                            value={image.unit}
+                            onChange={(e) => updateImage(image.id, { unit: e.target.value.toUpperCase() })}
+                            placeholder="e.g., A01"
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`caption-${image.id}`} className="text-xs">
+                            Caption
+                          </Label>
+                          <Input
+                            id={`caption-${image.id}`}
+                            value={image.caption}
+                            onChange={(e) => updateImage(image.id, { caption: e.target.value })}
+                            placeholder="Image description"
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }
