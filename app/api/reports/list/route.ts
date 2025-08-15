@@ -1,35 +1,20 @@
+import { list } from "@vercel/blob"
 import { NextResponse } from "next/server"
 
 export async function GET() {
   try {
     console.log("[v0] List route called")
 
-    // Use direct REST API call to list blobs
-    const response = await fetch(
-      `https://${process.env.BLOB_READ_WRITE_TOKEN?.split("_")[1]}.blob.vercel-storage.com/`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}`,
-        },
-      },
-    )
-
-    if (!response.ok) {
-      throw new Error(`Blob API error: ${response.status} ${response.statusText}`)
-    }
-
-    const data = await response.json()
-    const blobs = data.blobs || []
+    const { blobs } = await list()
 
     // Filter for JSON report files and sort by creation date (newest first)
     const reportFiles = blobs
-      .filter((blob: any) => blob.pathname.endsWith(".json"))
-      .sort((a: any, b: any) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
+      .filter((blob) => blob.pathname.endsWith(".json"))
+      .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
       .slice(0, 15) // Limit to 15 most recent
 
     // Parse filenames to extract property names and timestamps
-    const reports = reportFiles.map((blob: any) => {
+    const reports = reportFiles.map((blob) => {
       const filename = blob.pathname
       const parts = filename.replace(".json", "").split("_")
 
