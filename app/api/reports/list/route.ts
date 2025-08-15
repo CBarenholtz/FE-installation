@@ -1,14 +1,12 @@
-import { list } from "@vercel/blob"
 import { NextResponse } from "next/server"
+import { list } from "@vercel/blob"
 
 export async function GET() {
   try {
     console.log("[v0] List route called")
 
-    // List all JSON files from Vercel Blob
-    const { blobs } = await list({
-      prefix: "",
-    })
+    // Use Vercel Blob SDK to list files
+    const { blobs } = await list()
 
     // Filter for JSON report files and sort by creation date (newest first)
     const reportFiles = blobs
