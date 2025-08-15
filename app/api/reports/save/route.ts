@@ -10,13 +10,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid report data" }, { status: 400 })
     }
 
-    let put: any
-    try {
-      const blobModule = require("@vercel/blob")
-      put = blobModule.put
-    } catch (error) {
-      console.error("[v0] Could not access @vercel/blob:", error)
-      return NextResponse.json({ error: "Blob storage not available" }, { status: 500 })
+    const token = process.env.BLOB_READ_WRITE_TOKEN
+    if (!token) {
+      console.error("[v0] BLOB_READ_WRITE_TOKEN not available")
+      return NextResponse.json({ error: "Blob storage not configured" }, { status: 500 })
     }
 
     // Create filename with ISO timestamp + property name
@@ -34,17 +31,27 @@ export async function POST(request: NextRequest) {
       savedAt: new Date().toISOString(),
     }
 
-    const blob = await put(filename, JSON.stringify(reportWithTimestamp, null, 2), {
-      access: "public",
-      contentType: "application/json",
+    // Use direct REST API call to Vercel Blob
+    const response = await fetch(`https://blob.vercel-storage.com/${filename}`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(reportWithTimestamp, null, 2),
     })
 
-    console.log("[v0] Report saved successfully:", blob.url)
+    if (!response.ok) {
+      throw new Error(`Blob API error: ${response.status} ${response.statusText}`)
+    }
+
+    const result = await response.json()
+    console.log("[v0] Report saved successfully:", result.url)
 
     return NextResponse.json({
       success: true,
       filename,
-      url: blob.url,
+      url: result.url,
       propertyName: sanitizedPropertyName,
       timestamp,
     })
