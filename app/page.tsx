@@ -8,8 +8,9 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useRouter } from "next/navigation"
-import { ChevronLeft, Upload, FileText, Save } from "lucide-react"
+import { ChevronLeft, Upload, FileText, Save, Download } from "lucide-react"
 import ReportCoverPage from "@/components/report-cover-page"
 import ReportLetterPage from "@/components/report-letter-page"
 import ReportNotesPage from "@/components/report-notes-page"
@@ -20,8 +21,16 @@ import ImageUpload from "@/components/image-upload"
 import ReportPicturesPage from "@/components/report-pictures-page"
 import { ReportProvider, useReportContext } from "@/lib/report-context"
 import { parseExcelFile } from "@/lib/excel-parser"
-import { ReportManager } from "@/lib/report-manager"
 import type { CustomerInfo, InstallationData, Note, ImageData } from "@/lib/types"
+
+interface SavedReport {
+  url: string
+  filename: string
+  propertyName: string
+  timestamp: string
+  uploadedAt: string
+  size: number
+}
 
 function UploadForm() {
   const router = useRouter()
@@ -37,6 +46,80 @@ function UploadForm() {
   })
   const [coverImage, setCoverImage] = useState<File | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [savedReports, setSavedReports] = useState<SavedReport[]>([])
+  const [selectedReport, setSelectedReport] = useState<string>("")
+  const [isLoadingReports, setIsLoadingReports] = useState(false)
+
+  useEffect(() => {
+    loadSavedReports()
+  }, [])
+
+  const loadSavedReports = async () => {
+    try {
+      setIsLoadingReports(true)
+      const response = await fetch("/api/reports/list")
+      const data = await response.json()
+
+      if (data.reports) {
+        setSavedReports(data.reports)
+      }
+    } catch (error) {
+      console.error("Error loading saved reports:", error)
+    } finally {
+      setIsLoadingReports(false)
+    }
+  }
+
+  const handleLoadReport = async () => {
+    if (!selectedReport) return
+
+    try {
+      setIsProcessing(true)
+      const response = await fetch("/api/reports/load", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: selectedReport }),
+      })
+
+      const data = await response.json()
+
+      if (data.success && data.reportData) {
+        // Load report data into localStorage and navigate
+        const reportData = data.reportData
+
+        // Store all report data in localStorage
+        if (reportData.customerInfo) {
+          localStorage.setItem("customerInfo", JSON.stringify(reportData.customerInfo))
+        }
+        if (reportData.installationData) {
+          localStorage.setItem("installationData", JSON.stringify(reportData.installationData))
+          localStorage.setItem("rawInstallationData", JSON.stringify(reportData.installationData))
+        }
+        if (reportData.toiletCount) {
+          localStorage.setItem("toiletCount", JSON.stringify(reportData.toiletCount))
+        }
+        if (reportData.reportImages) {
+          localStorage.setItem("reportImages", JSON.stringify(reportData.reportImages))
+        }
+        if (reportData.reportNotes) {
+          localStorage.setItem("reportNotes", JSON.stringify(reportData.reportNotes))
+        }
+        if (reportData.coverImage) {
+          localStorage.setItem("coverImage", reportData.coverImage)
+        }
+
+        // Navigate to report view
+        window.location.reload()
+      } else {
+        alert("Error loading report: " + (data.error || "Unknown error"))
+      }
+    } catch (error) {
+      console.error("Error loading report:", error)
+      alert("Error loading report. Please try again.")
+    } finally {
+      setIsProcessing(false)
+    }
+  }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
@@ -117,6 +200,38 @@ function UploadForm() {
               My Reports
             </Button>
           </div>
+
+          {savedReports.length > 0 && (
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+              <h2 className="text-lg font-semibold mb-3">Load Recent Report</h2>
+              <div className="flex gap-3 items-end">
+                <div className="flex-1">
+                  <Label htmlFor="savedReport">Select a recent report to load</Label>
+                  <Select value={selectedReport} onValueChange={setSelectedReport}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a saved report..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {savedReports.map((report) => (
+                        <SelectItem key={report.url} value={report.url}>
+                          {report.propertyName} - {new Date(report.timestamp).toLocaleDateString()}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  onClick={handleLoadReport}
+                  disabled={!selectedReport || isProcessing}
+                  variant="outline"
+                  className="flex items-center gap-2 bg-transparent"
+                >
+                  <Download className="h-4 w-4" />
+                  Load Report
+                </Button>
+              </div>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Customer Information */}
@@ -274,10 +389,36 @@ function ReportView({
     localStorage.setItem("reportImages", JSON.stringify(uploadedImages))
   }
 
-  const handleSaveReport = () => {
+  const handleSaveReport = async () => {
     try {
-      const reportId = ReportManager.saveCurrentReport()
-      alert(`Report saved successfully! You can find it in "My Reports".`)
+      // Gather all report data
+      const reportData = {
+        customerInfo,
+        installationData,
+        toiletCount,
+        reportNotes: notes,
+        reportImages: images,
+        coverImage: localStorage.getItem("coverImage"),
+        reportTitle: localStorage.getItem("reportTitle"),
+        letterText: localStorage.getItem("letterText"),
+        signatureName: localStorage.getItem("signatureName"),
+        signatureTitle: localStorage.getItem("signatureTitle"),
+        savedAt: new Date().toISOString(),
+      }
+
+      const response = await fetch("/api/reports/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(reportData),
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        alert(`Report saved successfully to cloud storage!\nProperty: ${result.propertyName}`)
+      } else {
+        throw new Error(result.error || "Failed to save report")
+      }
     } catch (error) {
       console.error("Error saving report:", error)
       alert("Error saving report. Please try again.")
@@ -285,19 +426,16 @@ function ReportView({
   }
 
   const handleBackWithSaveOption = () => {
-    if (ReportManager.hasUnsavedWork()) {
+    const hasData = installationData.length > 0 || images.length > 0 || notes.length > 0
+
+    if (hasData) {
       const shouldSave = confirm(
-        "You have unsaved work. Would you like to save this report before going back?\n\nClick OK to save, or Cancel to discard changes.",
+        "You have unsaved work. Would you like to save this report to cloud storage before going back?\n\nClick OK to save, or Cancel to discard changes.",
       )
 
       if (shouldSave) {
-        try {
-          const reportId = ReportManager.saveCurrentReport()
-          alert("Report saved successfully!")
-        } catch (error) {
-          console.error("Error saving report:", error)
-          alert("Error saving report, but continuing anyway.")
-        }
+        handleSaveReport()
+        return
       }
     }
 
@@ -311,10 +449,6 @@ function ReportView({
           <Button variant="outline" onClick={handleBackWithSaveOption}>
             <ChevronLeft className="mr-2 h-4 w-4" />
             Back to Form
-          </Button>
-          <Button variant="outline" onClick={() => router.push("/my-reports")}>
-            <FileText className="mr-2 h-4 w-4" />
-            My Reports
           </Button>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -337,6 +471,24 @@ function ReportView({
         </div>
       </div>
 
+      {/* Hidden content for printing - using the same components as the preview but with editing disabled */}
+      <div className="hidden print-content">
+        <div className="report-page">
+          <ReportCoverPage customerInfo={customerInfo} isEditable={false} />
+        </div>
+        <div className="page-break"></div>
+        <div className="report-page">
+          <ReportLetterPage customerInfo={customerInfo} toiletCount={toiletCount} isEditable={false} />
+        </div>
+        <div className="page-break"></div>
+        <ReportNotesPage notes={notes} isPreview={false} isEditable={false} />
+        <div className="page-break"></div>
+        <ReportDetailPage installationData={installationData} isPreview={false} isEditable={false} />
+        <div className="page-break"></div>
+        <ReportPicturesPage isPreview={false} isEditable={false} />
+      </div>
+
+      {/* Actual report view content */}
       <div className="print:hidden">
         <Tabs value={currentPage} onValueChange={setCurrentPage}>
           <TabsList className="grid grid-cols-5">
@@ -381,23 +533,6 @@ function ReportView({
             </div>
           </TabsContent>
         </Tabs>
-      </div>
-
-      {/* Hidden content for printing - using the same components as the preview but with editing disabled */}
-      <div className="hidden print-content">
-        <div className="report-page">
-          <ReportCoverPage customerInfo={customerInfo} isEditable={false} />
-        </div>
-        <div className="page-break"></div>
-        <div className="report-page">
-          <ReportLetterPage customerInfo={customerInfo} toiletCount={toiletCount} isEditable={false} />
-        </div>
-        <div className="page-break"></div>
-        <ReportNotesPage notes={notes} isPreview={false} isEditable={false} />
-        <div className="page-break"></div>
-        <ReportDetailPage installationData={installationData} isPreview={false} isEditable={false} />
-        <div className="page-break"></div>
-        <ReportPicturesPage isPreview={false} isEditable={false} />
       </div>
     </div>
   )
