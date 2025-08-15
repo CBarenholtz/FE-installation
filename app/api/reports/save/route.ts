@@ -1,5 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { put } from "@vercel/blob"
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,6 +8,15 @@ export async function POST(request: NextRequest) {
 
     if (!reportData || !reportData.customerInfo) {
       return NextResponse.json({ error: "Invalid report data" }, { status: 400 })
+    }
+
+    let put: any
+    try {
+      const blobModule = require("@vercel/blob")
+      put = blobModule.put
+    } catch (error) {
+      console.error("[v0] Could not access @vercel/blob:", error)
+      return NextResponse.json({ error: "Blob storage not available" }, { status: 500 })
     }
 
     // Create filename with ISO timestamp + property name
