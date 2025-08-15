@@ -1,5 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { put } from "@vercel/blob"
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,22 +25,29 @@ export async function POST(request: NextRequest) {
       savedAt: new Date().toISOString(),
     }
 
-    // Convert to blob for upload
-    const jsonBlob = new Blob([JSON.stringify(reportWithTimestamp, null, 2)], {
-      type: "application/json",
-    })
+    const response = await fetch(
+      `https://${process.env.BLOB_READ_WRITE_TOKEN?.split("_")[1]}.blob.vercel-storage.com/${filename}`,
+      {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(reportWithTimestamp, null, 2),
+      },
+    )
 
-    // Upload using Vercel Blob SDK
-    const blob = await put(filename, jsonBlob, {
-      access: "public",
-    })
+    if (!response.ok) {
+      throw new Error(`Blob API error: ${response.status} ${response.statusText}`)
+    }
 
-    console.log("[v0] Report saved successfully:", blob)
+    const result = await response.json()
+    console.log("[v0] Report saved successfully:", result)
 
     return NextResponse.json({
       success: true,
       filename,
-      url: blob.url,
+      url: result.url,
       propertyName: sanitizedPropertyName,
       timestamp,
     })
