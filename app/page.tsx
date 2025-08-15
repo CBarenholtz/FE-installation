@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useRouter } from "next/navigation"
-import { ChevronLeft, Upload, FileText, Save, Download } from "lucide-react"
+import { ChevronLeft, Upload, Save, Download } from "lucide-react"
 import ReportCoverPage from "@/components/report-cover-page"
 import ReportLetterPage from "@/components/report-letter-page"
 import ReportNotesPage from "@/components/report-notes-page"
@@ -195,15 +195,13 @@ function UploadForm() {
         <CardContent className="pt-6">
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-2xl font-bold">Water Installation Report Generator</h1>
-            <Button variant="outline" onClick={() => router.push("/my-reports")} className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              My Reports
-            </Button>
           </div>
 
-          {savedReports.length > 0 && (
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-              <h2 className="text-lg font-semibold mb-3">Load Recent Report</h2>
+          <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+            <h2 className="text-lg font-semibold mb-3">Load Recent Report</h2>
+            {isLoadingReports ? (
+              <p className="text-gray-600">Loading saved reports...</p>
+            ) : savedReports.length > 0 ? (
               <div className="flex gap-3 items-end">
                 <div className="flex-1">
                   <Label htmlFor="savedReport">Select a recent report to load</Label>
@@ -230,8 +228,10 @@ function UploadForm() {
                   Load Report
                 </Button>
               </div>
-            </div>
-          )}
+            ) : (
+              <p className="text-gray-600">No saved reports found. Generate and save a report to see it here.</p>
+            )}
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Customer Information */}
