@@ -165,20 +165,10 @@ export default function ReportPicturesPage({ isPreview = true, isEditable = true
   }
 
   return isPreview ? (
-    // Preview mode - show all images in one scrollable view
-    <div className="report-page min-h-[1056px] relative">
-      {/* Header with logo */}
-      <div className="mb-8">
-        <img
-          src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Screenshot%202025-04-29%20115501-BD1uw5tVq9PtVYW6Z6FKM1i8in6GeV.png"
-          alt="GreenLight Logo"
-          className="h-24"
-          crossOrigin="anonymous"
-        />
-      </div>
-
-      {/* Content */}
-      <div className="mb-16">
+    // Preview mode - show all images in one scrollable view WITHOUT header/footer
+    <div className="space-y-6">
+      {/* Content only - no header/footer in preview mode */}
+      <div>
         <h2 className="text-xl font-bold mb-6">
           {isEditable ? (
             <EditableText
@@ -192,75 +182,72 @@ export default function ReportPicturesPage({ isPreview = true, isEditable = true
           )}
         </h2>
 
-        {/* Images organized by unit */}
-        <div className="space-y-8">
-          {sortedUnits.map((unit) => (
-            <div key={unit} className="space-y-4">
-              <h3 className="text-lg font-semibold border-b pb-2">Unit {unit}</h3>
-              <div className="grid grid-cols-3 gap-6">
-                {processedImages[unit].map((image) => (
-                  <div key={image.id} className="space-y-2">
-                    <div className="relative">
-                      <img
-                        src={image.url || "/placeholder.svg"}
-                        alt={image.caption || image.filename}
-                        className="w-full h-48 object-cover rounded border"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement
-                          target.src = "/placeholder.svg?key=error"
-                        }}
-                      />
-                      {isEditable && (
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          className="absolute top-2 right-2 h-8 w-8 p-0"
-                          onClick={() => handleRemoveImage(image.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
+        {allImages.length === 0 ? (
+          <div className="text-center py-16 text-gray-500">
+            <p className="text-lg">No pictures have been uploaded for this report.</p>
+            {isEditable && <p className="text-sm mt-2">Go to the Pictures tab to upload images.</p>}
+          </div>
+        ) : (
+          /* Images organized by unit */
+          <div className="space-y-8">
+            {sortedUnits.map((unit) => (
+              <div key={unit} className="space-y-4">
+                <h3 className="text-lg font-semibold border-b pb-2">Unit {unit}</h3>
+                <div className="grid grid-cols-3 gap-6">
+                  {processedImages[unit].map((image) => (
+                    <div key={image.id} className="space-y-2">
+                      <div className="relative">
+                        <img
+                          src={image.url || "/placeholder.svg"}
+                          alt={image.caption || image.filename}
+                          className="w-full h-48 object-cover rounded border"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement
+                            target.src = "/placeholder.svg?key=error"
+                          }}
+                        />
+                        {isEditable && (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="absolute top-2 right-2 h-8 w-8 p-0"
+                            onClick={() => handleRemoveImage(image.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        {isEditable ? (
+                          <>
+                            <EditableText
+                              value={image.unit}
+                              onChange={(value) => handleUnitChange(image.id, value)}
+                              placeholder="Unit"
+                              className="text-sm font-medium"
+                            />
+                            <EditableText
+                              value={image.caption}
+                              onChange={(value) => handleCaptionChange(image.id, value)}
+                              placeholder="Image caption"
+                              className="text-sm text-gray-600"
+                              multiline={true}
+                            />
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-sm font-medium">Unit {image.unit}</p>
+                            <p className="text-sm text-gray-600">{image.caption}</p>
+                          </>
+                        )}
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      {isEditable ? (
-                        <>
-                          <EditableText
-                            value={image.unit}
-                            onChange={(value) => handleUnitChange(image.id, value)}
-                            placeholder="Unit"
-                            className="text-sm font-medium"
-                          />
-                          <EditableText
-                            value={image.caption}
-                            onChange={(value) => handleCaptionChange(image.id, value)}
-                            placeholder="Image caption"
-                            className="text-sm text-gray-600"
-                            multiline={true}
-                          />
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-sm font-medium">Unit {image.unit}</p>
-                          <p className="text-sm text-gray-600">{image.caption}</p>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="footer-container">
-        <img
-          src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Screenshot%202025-04-29%20115454-uWCS2yWrowegSqw9c2SIVcLdedTk82.png"
-          alt="GreenLight Footer"
-          className="w-full h-auto"
-          crossOrigin="anonymous"
-        />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   ) : (
