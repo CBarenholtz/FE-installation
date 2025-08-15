@@ -1,5 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { put } from "@vercel/blob"
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,18 +15,35 @@ export async function POST(request: NextRequest) {
     const sanitizedPropertyName = propertyName.replace(/[^a-zA-Z0-9-_]/g, "-")
     const filename = `${timestamp}_${sanitizedPropertyName}.json`
 
-    const blob = await put(filename, JSON.stringify(reportData, null, 2), {
-      access: "public",
+    const token = process.env.BLOB_READ_WRITE_TOKEN
+    if (!token) {
+      throw new Error("BLOB_READ_WRITE_TOKEN not found")
+    }
+
+    const response = await fetch(`https://blob.vercel-storage.com/${filename}`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(reportData, null, 2),
     })
 
-    console.log("[v0] Report saved to Blob storage:", blob.url)
+    if (!response.ok) {
+      throw new Error(`Blob API error: ${response.status} ${response.statusText}`)
+    }
+
+    const result = await response.json()
+    const url = result.url || `https://blob.vercel-storage.com/${filename}`
+
+    console.log("[v0] Report saved to Blob storage:", url)
 
     return NextResponse.json({
       success: true,
       filename,
       propertyName: sanitizedPropertyName,
       timestamp,
-      url: blob.url,
+      url,
       message: "Report saved to cloud storage",
     })
   } catch (error) {

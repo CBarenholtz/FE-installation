@@ -1,15 +1,31 @@
 import { NextResponse } from "next/server"
-import { list } from "@vercel/blob"
 
 export async function GET() {
   try {
     console.log("[v0] List route called")
 
-    const { blobs } = await list()
+    const token = process.env.BLOB_READ_WRITE_TOKEN
+    if (!token) {
+      throw new Error("BLOB_READ_WRITE_TOKEN not found")
+    }
 
-    const jsonBlobs = blobs.filter((blob) => blob.pathname.endsWith(".json"))
+    const response = await fetch("https://blob.vercel-storage.com/", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
 
-    const reports = jsonBlobs.map((blob) => {
+    if (!response.ok) {
+      throw new Error(`Blob API error: ${response.status} ${response.statusText}`)
+    }
+
+    const data = await response.json()
+    const blobs = data.blobs || []
+
+    const jsonBlobs = blobs.filter((blob: any) => blob.pathname.endsWith(".json"))
+
+    const reports = jsonBlobs.map((blob: any) => {
       const filename = blob.pathname
       const [timestamp, ...propertyParts] = filename.replace(".json", "").split("_")
       const propertyName = propertyParts.join("_").replace(/-/g, " ")
@@ -24,7 +40,7 @@ export async function GET() {
     })
 
     const sortedReports = reports
-      .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
+      .sort((a: any, b: any) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
       .slice(0, 15) // Get 15 most recent reports
 
     console.log("[v0] Found", sortedReports.length, "reports in Blob storage")
