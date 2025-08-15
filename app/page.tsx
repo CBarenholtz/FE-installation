@@ -415,28 +415,53 @@ function ReportContent() {
   const [reportNotes, setReportNotes] = useState<Note[]>([])
 
   const handleBack = () => {
-    localStorage.removeItem("installationData")
-    localStorage.removeItem("toiletCount")
-    localStorage.removeItem("customerInfo")
-    localStorage.removeItem("rawInstallationData")
-    localStorage.removeItem("coverImage")
-    localStorage.removeItem("reportImages")
-    localStorage.removeItem("selectedCells")
-    localStorage.removeItem("selectedNotesColumns")
+    try {
+      console.log("[v0] Starting handleBack - clearing localStorage")
 
-    setInstallationData([])
-    setFilteredData([])
-    setReportNotes([])
-    setLoading(true)
+      // Clear all localStorage items with individual error handling
+      const itemsToRemove = [
+        "installationData",
+        "toiletCount",
+        "customerInfo",
+        "rawInstallationData",
+        "coverImage",
+        "reportImages",
+        "selectedCells",
+        "selectedNotesColumns",
+        "reportNotes",
+        "reportTitle",
+        "letterText",
+        "signatureName",
+        "signatureTitle",
+        "editedUnits",
+      ]
 
-    setTimeout(() => {
-      loadData()
-    }, 100)
+      itemsToRemove.forEach((item) => {
+        try {
+          localStorage.removeItem(item)
+        } catch (error) {
+          console.error(`[v0] Error removing ${item} from localStorage:`, error)
+        }
+      })
+
+      setInstallationData([])
+      setFilteredData([])
+      setReportNotes([])
+      setToiletCount(0)
+      setLoading(true)
+
+      console.log("[v0] localStorage cleared and state reset")
+    } catch (error) {
+      console.error("[v0] Error in handleBack:", error)
+      // Fallback: navigate to home page
+      router.push("/")
+    }
   }
 
   // Load data from localStorage
   const loadData = useCallback(() => {
     try {
+      console.log("[v0] Loading data from localStorage")
       const storedInstallationData = localStorage.getItem("installationData")
       const storedToiletCount = localStorage.getItem("toiletCount")
 
@@ -491,7 +516,11 @@ function ReportContent() {
         setReportNotes(notes)
       }
     } catch (error) {
-      console.error("Error loading data:", error)
+      console.error("[v0] Error loading data:", error)
+      // If data loading fails, ensure we're in a clean state
+      setInstallationData([])
+      setFilteredData([])
+      setReportNotes([])
     } finally {
       setLoading(false)
     }
