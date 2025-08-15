@@ -3,45 +3,48 @@ import { type NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest) {
   try {
-    console.log("[v0] Starting report save process")
-    const reportData = await request.json()
-    console.log("[v0] Report data received, size:", JSON.stringify(reportData).length)
+    console.log("[v0] Save route called")
 
-    // Extract property name for filename
-    const propertyName = reportData.customerInfo?.propertyName || "Unknown-Property"
-    console.log("[v0] Property name:", propertyName)
+    const { reportData } = await request.json()
 
-    // Create ISO timestamp
+    if (!reportData || !reportData.customerInfo) {
+      return NextResponse.json({ error: "Invalid report data" }, { status: 400 })
+    }
+
+    // Create filename with ISO timestamp + property name
     const timestamp = new Date().toISOString()
+    const propertyName = reportData.customerInfo.propertyName || "Unknown-Property"
+    const sanitizedPropertyName = propertyName.replace(/[^a-zA-Z0-9-_]/g, "-")
+    const filename = `${timestamp}_${sanitizedPropertyName}.json`
 
-    // Create filename: ISO timestamp + property name
-    const filename = `${timestamp}_${propertyName.replace(/[^a-zA-Z0-9-_]/g, "-")}.json`
-    console.log("[v0] Generated filename:", filename)
+    console.log("[v0] Saving report with filename:", filename)
 
-    // Convert report data to JSON string
-    const jsonContent = JSON.stringify(reportData, null, 2)
+    // Add timestamp to report data
+    const reportWithTimestamp = {
+      ...reportData,
+      timestamp,
+      savedAt: new Date().toISOString(),
+    }
 
-    const blob = await put(filename, jsonContent, {
+    // Save to Vercel Blob
+    const blob = await put(filename, JSON.stringify(reportWithTimestamp), {
       access: "public",
       contentType: "application/json",
     })
 
-    console.log("[v0] Blob upload successful:", blob.url)
+    console.log("[v0] Report saved successfully:", blob.url)
 
     return NextResponse.json({
       success: true,
+      filename,
       url: blob.url,
-      filename: filename,
-      propertyName: propertyName,
-      timestamp: timestamp,
+      propertyName: sanitizedPropertyName,
+      timestamp,
     })
   } catch (error) {
-    console.error("[v0] Report save error:", error)
+    console.error("[v0] Error saving report:", error)
     return NextResponse.json(
-      {
-        error: "Failed to save report",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
+      { error: "Failed to save report", details: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 },
     )
   }

@@ -24,12 +24,12 @@ import { parseExcelFile } from "@/lib/excel-parser"
 import type { CustomerInfo, InstallationData, Note, ImageData } from "@/lib/types"
 
 interface SavedReport {
-  url: string
-  filename: string
+  id: string
   propertyName: string
   timestamp: string
-  uploadedAt: string
-  size: number
+  customerName: string
+  displayName: string
+  url?: string
 }
 
 function UploadForm() {
@@ -48,7 +48,6 @@ function UploadForm() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [savedReports, setSavedReports] = useState<SavedReport[]>([])
   const [selectedReport, setSelectedReport] = useState<string>("")
-  const [isLoadingReports, setIsLoadingReports] = useState(false)
 
   useEffect(() => {
     loadSavedReports()
@@ -56,17 +55,27 @@ function UploadForm() {
 
   const loadSavedReports = async () => {
     try {
-      setIsLoadingReports(true)
+      console.log("[v0] Loading saved reports from cloud storage")
       const response = await fetch("/api/reports/list")
-      const data = await response.json()
 
-      if (data.reports) {
-        setSavedReports(data.reports)
+      if (response.ok) {
+        const data = await response.json()
+        const reports = data.reports.map((report: any) => ({
+          id: report.filename,
+          propertyName: report.propertyName,
+          timestamp: report.timestamp,
+          customerName: report.propertyName, // Using property name as customer name for now
+          displayName: report.displayName,
+          url: report.url,
+        }))
+
+        setSavedReports(reports)
+        console.log("[v0] Loaded reports:", reports.length)
+      } else {
+        console.error("[v0] Failed to load reports:", response.status)
       }
     } catch (error) {
-      console.error("Error loading saved reports:", error)
-    } finally {
-      setIsLoadingReports(false)
+      console.error("[v0] Error loading saved reports:", error)
     }
   }
 
@@ -75,19 +84,29 @@ function UploadForm() {
 
     try {
       setIsProcessing(true)
+      console.log("[v0] Loading report:", selectedReport)
+
+      // Find the selected report
+      const report = savedReports.find((r) => r.id === selectedReport)
+      if (!report || !report.url) {
+        alert("Report not found")
+        return
+      }
+
+      // Load report data from cloud storage
       const response = await fetch("/api/reports/load", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: selectedReport }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ url: report.url }),
       })
 
-      const data = await response.json()
-
-      if (data.success && data.reportData) {
-        // Load report data into localStorage and navigate
+      if (response.ok) {
+        const data = await response.json()
         const reportData = data.reportData
 
-        // Store all report data in localStorage
+        // Load data into localStorage for the current session
         if (reportData.customerInfo) {
           localStorage.setItem("customerInfo", JSON.stringify(reportData.customerInfo))
         }
@@ -108,13 +127,13 @@ function UploadForm() {
           localStorage.setItem("coverImage", reportData.coverImage)
         }
 
-        // Navigate to report view
+        console.log("[v0] Report loaded successfully")
         window.location.reload()
       } else {
-        alert("Error loading report: " + (data.error || "Unknown error"))
+        alert("Error loading report. Please try again.")
       }
     } catch (error) {
-      console.error("Error loading report:", error)
+      console.error("[v0] Error loading report:", error)
       alert("Error loading report. Please try again.")
     } finally {
       setIsProcessing(false)
@@ -199,9 +218,7 @@ function UploadForm() {
 
           <div className="mb-6 p-4 bg-gray-50 rounded-lg">
             <h2 className="text-lg font-semibold mb-3">Load Recent Report</h2>
-            {isLoadingReports ? (
-              <p className="text-gray-600">Loading saved reports...</p>
-            ) : savedReports.length > 0 ? (
+            {savedReports.length > 0 ? (
               <div className="flex gap-3 items-end">
                 <div className="flex-1">
                   <Label htmlFor="savedReport">Select a recent report to load</Label>
@@ -211,8 +228,8 @@ function UploadForm() {
                     </SelectTrigger>
                     <SelectContent>
                       {savedReports.map((report) => (
-                        <SelectItem key={report.url} value={report.url}>
-                          {report.propertyName} - {new Date(report.timestamp).toLocaleDateString()}
+                        <SelectItem key={report.id} value={report.id}>
+                          {report.displayName}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -391,7 +408,8 @@ function ReportView({
 
   const handleSaveReport = async () => {
     try {
-      // Gather all report data
+      console.log("[v0] Saving report to cloud storage")
+
       const reportData = {
         customerInfo,
         installationData,
@@ -403,24 +421,28 @@ function ReportView({
         letterText: localStorage.getItem("letterText"),
         signatureName: localStorage.getItem("signatureName"),
         signatureTitle: localStorage.getItem("signatureTitle"),
-        savedAt: new Date().toISOString(),
       }
 
       const response = await fetch("/api/reports/save", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(reportData),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ reportData }),
       })
 
-      const result = await response.json()
-
-      if (result.success) {
-        alert(`Report saved successfully to cloud storage!\nProperty: ${result.propertyName}`)
+      if (response.ok) {
+        const data = await response.json()
+        alert(
+          `Report saved successfully to cloud storage!\nProperty: ${data.propertyName}\nSaved at: ${new Date().toLocaleString()}`,
+        )
       } else {
-        throw new Error(result.error || "Failed to save report")
+        const errorData = await response.json()
+        console.error("[v0] Save error:", errorData)
+        alert("Error saving report. Please try again.")
       }
     } catch (error) {
-      console.error("Error saving report:", error)
+      console.error("[v0] Error saving report:", error)
       alert("Error saving report. Please try again.")
     }
   }
@@ -430,7 +452,7 @@ function ReportView({
 
     if (hasData) {
       const shouldSave = confirm(
-        "You have unsaved work. Would you like to save this report to cloud storage before going back?\n\nClick OK to save, or Cancel to discard changes.",
+        "You have unsaved work. Would you like to save this report before going back?\n\nClick OK to save, or Cancel to discard changes.",
       )
 
       if (shouldSave) {
@@ -624,7 +646,9 @@ function ReportContent() {
             (item: InstallationData) =>
               item["Leak Issue Kitchen Faucet"] ||
               item["Leak Issue Bath Faucet"] ||
-              item["Tub Spout/Diverter Leak Issue"] ||
+              item["Tub Spout/Diverter Leak Issue"] === "Light" ||
+              item["Tub Spout/Diverter Leak Issue"] === "Moderate" ||
+              item["Tub Spout/Diverter Leak Issue"] === "Heavy" ||
               (item.Notes && item.Notes.trim() !== ""),
           )
           .map((item: InstallationData) => {
