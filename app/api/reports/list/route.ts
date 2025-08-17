@@ -4,65 +4,41 @@ export async function GET() {
   try {
     console.log("[v0] List route called")
 
-    console.log("[v0] Environment check:")
-    console.log("[v0] GITHUB_TOKEN exists:", !!process.env.GITHUB_TOKEN)
-    console.log("[v0] GITHUB_OWNER:", process.env.GITHUB_OWNER || "not set")
-    console.log("[v0] GITHUB_REPO:", process.env.GITHUB_REPO || "not set")
-    console.log(
-      "[v0] All env vars starting with GITHUB:",
-      Object.keys(process.env).filter((key) => key.startsWith("GITHUB")),
-    )
+    const token = process.env.BLOB_READ_WRITE_TOKEN
 
-    const token = process.env.GITHUB_TOKEN
-    const owner = process.env.GITHUB_OWNER
-    const repo = process.env.GITHUB_REPO || "water-reports"
-
-    if (!token || !owner) {
-      console.log("[v0] GitHub storage not configured, returning empty list")
-      console.log("[v0] Missing:", !token ? "GITHUB_TOKEN" : "", !owner ? "GITHUB_OWNER" : "")
+    if (!token) {
+      console.log("[v0] Blob storage not configured, returning empty list")
       return NextResponse.json({
         success: true,
         reports: [],
-        message: "GitHub storage not configured",
+        message: "Blob storage not configured",
       })
     }
 
-    console.log("[v0] GitHub configured - Owner:", owner, "Repo:", repo)
+    console.log("[v0] Blob storage configured, fetching reports")
 
-    const githubUrl = `https://api.github.com/repos/${owner}/${repo}/contents/reports`
-
-    const response = await fetch(githubUrl, {
+    const response = await fetch("https://blob.vercel-storage.com/", {
       method: "GET",
       headers: {
         Authorization: `Bearer ${token}`,
-        Accept: "application/vnd.github.v3+json",
       },
     })
 
     if (!response.ok) {
-      if (response.status === 404) {
-        // Reports directory doesn't exist yet
-        console.log("[v0] Reports directory not found, returning empty list")
-        return NextResponse.json({
-          success: true,
-          reports: [],
-          message: "No reports found",
-        })
-      }
       const errorText = await response.text()
-      throw new Error(`GitHub API error: ${response.status} ${response.statusText} - ${errorText}`)
+      throw new Error(`Blob API error: ${response.status} ${response.statusText} - ${errorText}`)
     }
 
-    const files = await response.json()
+    const { blobs } = await response.json()
 
-    // Filter for JSON files and sort by name (which includes timestamp)
-    const reportFiles = files
-      .filter((file: any) => file.name?.endsWith(".json"))
-      .sort((a: any, b: any) => b.name.localeCompare(a.name))
+    // Filter for JSON files and sort by pathname (which includes timestamp)
+    const reportBlobs = blobs
+      .filter((blob: any) => blob.pathname?.endsWith(".json"))
+      .sort((a: any, b: any) => b.pathname.localeCompare(a.pathname))
       .slice(0, 15) // Get most recent 15 reports
 
-    const reports = reportFiles.map((file: any) => {
-      const filename = file.name
+    const reports = reportBlobs.map((blob: any) => {
+      const filename = blob.pathname
       const parts = filename.replace(".json", "").split("_")
       const timestamp = parts[0]
       const propertyName = parts.slice(1).join("_").replace(/-/g, " ")
@@ -71,13 +47,13 @@ export async function GET() {
         filename,
         propertyName,
         timestamp,
-        uploadDate: timestamp,
-        url: file.html_url,
+        uploadDate: blob.uploadedAt,
+        url: blob.url,
         displayName: `${propertyName} (${new Date(timestamp.replace(/-/g, ":")).toLocaleDateString()})`,
       }
     })
 
-    console.log(`[v0] Found ${reports.length} reports in GitHub storage (max 15)`)
+    console.log(`[v0] Found ${reports.length} reports in Blob storage`)
 
     return NextResponse.json({
       success: true,

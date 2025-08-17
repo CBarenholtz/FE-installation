@@ -16,104 +16,63 @@ export async function POST(request: NextRequest) {
     const windowsCompatibleTimestamp = timestamp.replace(/:/g, "-")
     const filename = `${windowsCompatibleTimestamp}_${sanitizedPropertyName}.json`
 
-    const token = process.env.GITHUB_TOKEN
-    const owner = process.env.GITHUB_OWNER || "your-username"
-    const repo = process.env.GITHUB_REPO || "water-reports"
+    const token = process.env.BLOB_READ_WRITE_TOKEN
 
     if (!token) {
       return NextResponse.json(
         {
-          error: "GitHub storage not configured",
-          details: "GITHUB_TOKEN not available",
+          error: "Blob storage not configured",
+          details: "BLOB_READ_WRITE_TOKEN not available",
         },
         { status: 500 },
       )
     }
 
-    // Verify repository access
-    const repoUrl = `https://api.github.com/repos/${owner}/${repo}`
-    const repoCheck = await fetch(repoUrl, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/vnd.github.v3+json",
-      },
-    })
-
-    if (!repoCheck.ok) {
-      const errorText = await repoCheck.text()
-      return NextResponse.json(
-        {
-          error: "Cannot access repository",
-          details: `Repository ${owner}/${repo} not accessible: ${repoCheck.status} ${repoCheck.statusText} - ${errorText}`,
-        },
-        { status: 500 },
-      )
-    }
-
-    const repoData = await repoCheck.json()
-    const defaultBranch = repoData.default_branch || "main"
-
-    const content = Buffer.from(JSON.stringify(reportData, null, 2)).toString("base64")
-    const githubUrl = `https://api.github.com/repos/${owner}/${repo}/contents/reports/${filename}`
-
-    const response = await fetch(githubUrl, {
+    // Upload to Vercel Blob using PUT request
+    const blobUrl = `https://blob.vercel-storage.com/${filename}`
+    const response = await fetch(blobUrl, {
       method: "PUT",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
-        Accept: "application/vnd.github.v3+json",
       },
-      body: JSON.stringify({
-        message: `Add water report for ${sanitizedPropertyName}`,
-        content,
-        branch: defaultBranch, // Use detected default branch instead of hardcoded "main"
-      }),
+      body: JSON.stringify(reportData),
     })
 
     if (!response.ok) {
       const errorText = await response.text()
-      throw new Error(`GitHub API error: ${response.status} ${response.statusText} - ${errorText}`)
+      throw new Error(`Blob API error: ${response.status} ${response.statusText} - ${errorText}`)
     }
 
     const result = await response.json()
-    console.log("[v0] Report saved to GitHub:", result.content.html_url)
+    console.log("[v0] Report saved to Blob storage:", result.url)
 
+    // Clean up old reports - keep only 15 most recent
     try {
-      const listUrl = `https://api.github.com/repos/${owner}/${repo}/contents/reports`
-      const listResponse = await fetch(listUrl, {
+      const listResponse = await fetch("https://blob.vercel-storage.com/", {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
-          Accept: "application/vnd.github.v3+json",
         },
       })
 
       if (listResponse.ok) {
-        const files = await listResponse.json()
-        const reportFiles = files
-          .filter((file: any) => file.name?.endsWith(".json"))
-          .sort((a: any, b: any) => b.name.localeCompare(a.name))
+        const { blobs } = await listResponse.json()
+        const reportBlobs = blobs
+          .filter((blob: any) => blob.pathname?.endsWith(".json"))
+          .sort((a: any, b: any) => b.pathname.localeCompare(a.pathname))
 
         // Delete reports beyond the 15 most recent
-        if (reportFiles.length > 15) {
-          const filesToDelete = reportFiles.slice(15)
-          console.log(`[v0] Cleaning up ${filesToDelete.length} old reports`)
+        if (reportBlobs.length > 15) {
+          const blobsToDelete = reportBlobs.slice(15)
+          console.log(`[v0] Cleaning up ${blobsToDelete.length} old reports`)
 
-          for (const file of filesToDelete) {
-            const deleteUrl = `https://api.github.com/repos/${owner}/${repo}/contents/reports/${file.name}`
-            await fetch(deleteUrl, {
+          for (const blob of blobsToDelete) {
+            await fetch(`https://blob.vercel-storage.com/${blob.pathname}`, {
               method: "DELETE",
               headers: {
                 Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-                Accept: "application/vnd.github.v3+json",
               },
-              body: JSON.stringify({
-                message: `Clean up old report: ${file.name}`,
-                sha: file.sha,
-                branch: defaultBranch, // Use detected default branch for cleanup too
-              }),
             })
           }
         }
@@ -127,8 +86,8 @@ export async function POST(request: NextRequest) {
       filename,
       propertyName: sanitizedPropertyName,
       timestamp,
-      url: result.content.html_url,
-      message: "Report saved to GitHub storage",
+      url: result.url,
+      message: "Report saved to Blob storage",
     })
   } catch (error) {
     console.error("[v0] Error saving report:", error)
