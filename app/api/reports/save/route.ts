@@ -54,6 +54,49 @@ export async function POST(request: NextRequest) {
     const result = await response.json()
     console.log("[v0] Report saved to GitHub:", result.content.html_url)
 
+    try {
+      const listUrl = `https://api.github.com/repos/${owner}/${repo}/contents/reports`
+      const listResponse = await fetch(listUrl, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/vnd.github.v3+json",
+        },
+      })
+
+      if (listResponse.ok) {
+        const files = await listResponse.json()
+        const reportFiles = files
+          .filter((file: any) => file.name?.endsWith(".json"))
+          .sort((a: any, b: any) => b.name.localeCompare(a.name))
+
+        // Delete reports beyond the 15 most recent
+        if (reportFiles.length > 15) {
+          const filesToDelete = reportFiles.slice(15)
+          console.log(`[v0] Cleaning up ${filesToDelete.length} old reports`)
+
+          for (const file of filesToDelete) {
+            const deleteUrl = `https://api.github.com/repos/${owner}/${repo}/contents/reports/${file.name}`
+            await fetch(deleteUrl, {
+              method: "DELETE",
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+                Accept: "application/vnd.github.v3+json",
+              },
+              body: JSON.stringify({
+                message: `Clean up old report: ${file.name}`,
+                sha: file.sha,
+                branch: "main",
+              }),
+            })
+          }
+        }
+      }
+    } catch (cleanupError) {
+      console.warn("[v0] Cleanup failed but report was saved:", cleanupError)
+    }
+
     return NextResponse.json({
       success: true,
       filename,

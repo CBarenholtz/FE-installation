@@ -64,7 +64,7 @@ export async function GET() {
       }
     })
 
-    console.log(`[v0] Found ${reports.length} reports in GitHub storage`)
+    console.log(`[v0] Found ${reports.length} reports in GitHub storage (max 15)`)
 
     return NextResponse.json({
       success: true,
