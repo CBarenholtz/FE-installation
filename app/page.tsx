@@ -75,9 +75,11 @@ function UploadForm() {
         console.log("[v0] Loaded reports:", reports.length)
       } else {
         console.error("[v0] Failed to load reports:", response.status)
+        setSavedReports([])
       }
     } catch (error) {
       console.error("[v0] Error loading saved reports:", error)
+      setSavedReports([])
     } finally {
       setIsLoadingReports(false)
     }
@@ -661,12 +663,18 @@ function ReportContent() {
 
         console.log("Report: Generated notes from installation data:", notes)
         setReportNotes(notes)
+      } else {
+        setInstallationData([])
+        setFilteredData([])
+        setReportNotes([])
+        setToiletCount(0)
       }
     } catch (error) {
       console.error("[v0] Error loading data:", error)
       setInstallationData([])
       setFilteredData([])
       setReportNotes([])
+      setToiletCount(0)
     } finally {
       setLoading(false)
     }
