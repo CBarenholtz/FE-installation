@@ -48,6 +48,7 @@ function UploadForm() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [savedReports, setSavedReports] = useState<SavedReport[]>([])
   const [selectedReport, setSelectedReport] = useState<string>("")
+  const [isLoadingReports, setIsLoadingReports] = useState(false)
 
   useEffect(() => {
     loadSavedReports()
@@ -55,6 +56,7 @@ function UploadForm() {
 
   const loadSavedReports = async () => {
     try {
+      setIsLoadingReports(true)
       console.log("[v0] Loading saved reports from cloud storage")
       const response = await fetch("/api/reports/list")
 
@@ -76,6 +78,8 @@ function UploadForm() {
       }
     } catch (error) {
       console.error("[v0] Error loading saved reports:", error)
+    } finally {
+      setIsLoadingReports(false)
     }
   }
 
@@ -86,27 +90,18 @@ function UploadForm() {
       setIsProcessing(true)
       console.log("[v0] Loading report:", selectedReport)
 
-      // Find the selected report
       const report = savedReports.find((r) => r.id === selectedReport)
-      if (!report || !report.url) {
+      if (!report) {
         alert("Report not found")
         return
       }
 
-      // Load report data from cloud storage
-      const response = await fetch("/api/reports/load", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ url: report.url }),
-      })
+      const response = await fetch(`/api/reports/load?id=${selectedReport}`)
 
       if (response.ok) {
         const data = await response.json()
         const reportData = data.reportData
 
-        // Load data into localStorage for the current session
         if (reportData.customerInfo) {
           localStorage.setItem("customerInfo", JSON.stringify(reportData.customerInfo))
         }
@@ -170,7 +165,6 @@ function UploadForm() {
     setIsProcessing(true)
 
     try {
-      // Parse the Excel file
       const installationData = await parseExcelFile(file)
 
       if (installationData.length === 0) {
@@ -179,7 +173,6 @@ function UploadForm() {
         return
       }
 
-      // Store raw data and customer info
       localStorage.setItem("rawInstallationData", JSON.stringify(installationData))
       localStorage.setItem(
         "customerInfo",
@@ -189,7 +182,6 @@ function UploadForm() {
         }),
       )
 
-      // Handle cover image if provided
       if (coverImage) {
         const reader = new FileReader()
         reader.onload = (e) => {
@@ -218,7 +210,9 @@ function UploadForm() {
 
           <div className="mb-6 p-4 bg-gray-50 rounded-lg">
             <h2 className="text-lg font-semibold mb-3">Load Recent Report</h2>
-            {savedReports.length > 0 ? (
+            {isLoadingReports ? (
+              <p className="text-gray-600">Loading saved reports...</p>
+            ) : savedReports.length > 0 ? (
               <div className="flex gap-3 items-end">
                 <div className="flex-1">
                   <Label htmlFor="savedReport">Select a recent report to load</Label>
@@ -242,7 +236,7 @@ function UploadForm() {
                   className="flex items-center gap-2 bg-transparent"
                 >
                   <Download className="h-4 w-4" />
-                  Load Report
+                  {isProcessing ? "Loading..." : "Load Report"}
                 </Button>
               </div>
             ) : (
@@ -251,7 +245,6 @@ function UploadForm() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Customer Information */}
             <div className="space-y-4">
               <h2 className="text-lg font-semibold">Customer Information</h2>
 
@@ -330,13 +323,11 @@ function UploadForm() {
               </div>
             </div>
 
-            {/* Cover Image Upload */}
             <div>
               <Label htmlFor="coverImage">Cover Image (Optional)</Label>
               <Input id="coverImage" type="file" accept="image/*" onChange={handleCoverImageChange} />
             </div>
 
-            {/* File Upload */}
             <div>
               <Label htmlFor="file">Excel/CSV File *</Label>
               <Input id="file" type="file" accept=".csv,.xlsx,.xls" onChange={handleFileChange} required />
@@ -359,7 +350,6 @@ function UploadForm() {
   )
 }
 
-// Loading component - separate component for loading state
 function LoadingState() {
   return (
     <div className="flex items-center justify-center h-screen">
@@ -372,7 +362,6 @@ function NoDataState({ onBack }: { onBack: () => void }) {
   return <UploadForm />
 }
 
-// Report view component - separate component for the actual report
 function ReportView({
   customerInfo,
   installationData,
@@ -389,6 +378,7 @@ function ReportView({
   const router = useRouter()
   const [currentPage, setCurrentPage] = useState("cover")
   const [images, setImages] = useState<ImageData[]>([])
+  const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     const storedImages = localStorage.getItem("reportImages")
@@ -408,6 +398,7 @@ function ReportView({
 
   const handleSaveReport = async () => {
     try {
+      setIsSaving(true)
       console.log("[v0] Saving report to cloud storage")
 
       const reportData = {
@@ -436,6 +427,7 @@ function ReportView({
         alert(
           `Report saved successfully to cloud storage!\nProperty: ${data.propertyName}\nSaved at: ${new Date().toLocaleString()}`,
         )
+        onBack()
       } else {
         const errorData = await response.json()
         console.error("[v0] Save error:", errorData)
@@ -444,6 +436,8 @@ function ReportView({
     } catch (error) {
       console.error("[v0] Error saving report:", error)
       alert("Error saving report. Please try again.")
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -468,15 +462,15 @@ function ReportView({
     <div className="container mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-8 print:hidden">
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={handleBackWithSaveOption}>
+          <Button variant="outline" onClick={handleBackWithSaveOption} disabled={isSaving}>
             <ChevronLeft className="mr-2 h-4 w-4" />
             Back to Form
           </Button>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={handleSaveReport}>
+          <Button variant="outline" onClick={handleSaveReport} disabled={isSaving}>
             <Save className="mr-2 h-4 w-4" />
-            Save Report
+            {isSaving ? "Saving..." : "Save Report"}
           </Button>
           <ExcelExportButton
             customerInfo={customerInfo}
@@ -493,7 +487,6 @@ function ReportView({
         </div>
       </div>
 
-      {/* Hidden content for printing - using the same components as the preview but with editing disabled */}
       <div className="hidden print-content">
         <div className="report-page">
           <ReportCoverPage customerInfo={customerInfo} isEditable={false} />
@@ -510,7 +503,6 @@ function ReportView({
         <ReportPicturesPage isPreview={false} isEditable={false} />
       </div>
 
-      {/* Actual report view content */}
       <div className="print:hidden">
         <Tabs value={currentPage} onValueChange={setCurrentPage}>
           <TabsList className="grid grid-cols-5">
@@ -560,7 +552,6 @@ function ReportView({
   )
 }
 
-// Main content component
 function ReportContent() {
   const router = useRouter()
   const { customerInfo, toiletCount, setToiletCount, notes, setNotes } = useReportContext()
@@ -575,7 +566,6 @@ function ReportContent() {
     try {
       console.log("[v0] Starting handleBack - clearing localStorage")
 
-      // Clear all localStorage items with individual error handling
       const itemsToRemove = [
         "installationData",
         "toiletCount",
@@ -610,12 +600,10 @@ function ReportContent() {
       console.log("[v0] localStorage cleared and state reset")
     } catch (error) {
       console.error("[v0] Error in handleBack:", error)
-      // Fallback: navigate to home page
       router.push("/")
     }
   }
 
-  // Load data from localStorage
   const loadData = useCallback(() => {
     try {
       console.log("[v0] Loading data from localStorage")
@@ -676,7 +664,6 @@ function ReportContent() {
       }
     } catch (error) {
       console.error("[v0] Error loading data:", error)
-      // If data loading fails, ensure we're in a clean state
       setInstallationData([])
       setFilteredData([])
       setReportNotes([])
