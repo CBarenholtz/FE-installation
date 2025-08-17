@@ -4,6 +4,11 @@ export async function GET() {
   try {
     console.log("[v0] List route called")
 
+    console.log("[v0] Environment check:")
+    console.log("[v0] GITHUB_TOKEN exists:", !!process.env.GITHUB_TOKEN)
+    console.log("[v0] GITHUB_OWNER:", process.env.GITHUB_OWNER || "not set")
+    console.log("[v0] GITHUB_REPO:", process.env.GITHUB_REPO || "not set")
+
     const token = process.env.GITHUB_TOKEN
     const owner = process.env.GITHUB_OWNER || "your-username"
     const repo = process.env.GITHUB_REPO || "water-reports"
