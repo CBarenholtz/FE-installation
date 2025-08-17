@@ -15,36 +15,52 @@ export async function POST(request: NextRequest) {
     const sanitizedPropertyName = propertyName.replace(/[^a-zA-Z0-9-_]/g, "-")
     const filename = `${timestamp}_${sanitizedPropertyName}.json`
 
-    const token = process.env.BLOB_READ_WRITE_TOKEN
+    const token = process.env.GITHUB_TOKEN
+    const owner = process.env.GITHUB_OWNER || "your-username"
+    const repo = process.env.GITHUB_REPO || "water-reports"
+
     if (!token) {
-      throw new Error("BLOB_READ_WRITE_TOKEN not found")
+      return NextResponse.json(
+        {
+          error: "GitHub storage not configured",
+          details: "GITHUB_TOKEN not available",
+        },
+        { status: 500 },
+      )
     }
 
-    const response = await fetch(`https://blob.vercel-storage.com/${filename}`, {
+    const content = Buffer.from(JSON.stringify(reportData, null, 2)).toString("base64")
+    const githubUrl = `https://api.github.com/repos/${owner}/${repo}/contents/reports/${filename}`
+
+    const response = await fetch(githubUrl, {
       method: "PUT",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
+        Accept: "application/vnd.github.v3+json",
       },
-      body: JSON.stringify(reportData, null, 2),
+      body: JSON.stringify({
+        message: `Add water report for ${sanitizedPropertyName}`,
+        content,
+        branch: "main",
+      }),
     })
 
     if (!response.ok) {
-      throw new Error(`Blob API error: ${response.status} ${response.statusText}`)
+      const errorText = await response.text()
+      throw new Error(`GitHub API error: ${response.status} ${response.statusText} - ${errorText}`)
     }
 
     const result = await response.json()
-    const url = result.url || `https://blob.vercel-storage.com/${filename}`
-
-    console.log("[v0] Report saved to Blob storage:", url)
+    console.log("[v0] Report saved to GitHub:", result.content.html_url)
 
     return NextResponse.json({
       success: true,
       filename,
       propertyName: sanitizedPropertyName,
       timestamp,
-      url,
-      message: "Report saved to cloud storage",
+      url: result.content.html_url,
+      message: "Report saved to GitHub storage",
     })
   } catch (error) {
     console.error("[v0] Error saving report:", error)
