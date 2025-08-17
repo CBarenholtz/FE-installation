@@ -13,7 +13,8 @@ export async function POST(request: NextRequest) {
     const timestamp = new Date().toISOString()
     const propertyName = reportData.customerInfo.propertyName || "Unknown-Property"
     const sanitizedPropertyName = propertyName.replace(/[^a-zA-Z0-9-_]/g, "-")
-    const filename = `${timestamp}_${sanitizedPropertyName}.json`
+    const windowsCompatibleTimestamp = timestamp.replace(/:/g, "-")
+    const filename = `${windowsCompatibleTimestamp}_${sanitizedPropertyName}.json`
 
     const token = process.env.GITHUB_TOKEN
     const owner = process.env.GITHUB_OWNER || "your-username"
