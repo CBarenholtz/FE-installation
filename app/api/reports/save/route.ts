@@ -29,6 +29,30 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Verify repository access
+    const repoUrl = `https://api.github.com/repos/${owner}/${repo}`
+    const repoCheck = await fetch(repoUrl, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github.v3+json",
+      },
+    })
+
+    if (!repoCheck.ok) {
+      const errorText = await repoCheck.text()
+      return NextResponse.json(
+        {
+          error: "Cannot access repository",
+          details: `Repository ${owner}/${repo} not accessible: ${repoCheck.status} ${repoCheck.statusText} - ${errorText}`,
+        },
+        { status: 500 },
+      )
+    }
+
+    const repoData = await repoCheck.json()
+    const defaultBranch = repoData.default_branch || "main"
+
     const content = Buffer.from(JSON.stringify(reportData, null, 2)).toString("base64")
     const githubUrl = `https://api.github.com/repos/${owner}/${repo}/contents/reports/${filename}`
 
@@ -42,7 +66,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         message: `Add water report for ${sanitizedPropertyName}`,
         content,
-        branch: "main",
+        branch: defaultBranch, // Use detected default branch instead of hardcoded "main"
       }),
     })
 
@@ -87,7 +111,7 @@ export async function POST(request: NextRequest) {
               body: JSON.stringify({
                 message: `Clean up old report: ${file.name}`,
                 sha: file.sha,
-                branch: "main",
+                branch: defaultBranch, // Use detected default branch for cleanup too
               }),
             })
           }
