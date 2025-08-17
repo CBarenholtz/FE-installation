@@ -8,19 +8,26 @@ export async function GET() {
     console.log("[v0] GITHUB_TOKEN exists:", !!process.env.GITHUB_TOKEN)
     console.log("[v0] GITHUB_OWNER:", process.env.GITHUB_OWNER || "not set")
     console.log("[v0] GITHUB_REPO:", process.env.GITHUB_REPO || "not set")
+    console.log(
+      "[v0] All env vars starting with GITHUB:",
+      Object.keys(process.env).filter((key) => key.startsWith("GITHUB")),
+    )
 
     const token = process.env.GITHUB_TOKEN
-    const owner = process.env.GITHUB_OWNER || "your-username"
+    const owner = process.env.GITHUB_OWNER
     const repo = process.env.GITHUB_REPO || "water-reports"
 
-    if (!token) {
+    if (!token || !owner) {
       console.log("[v0] GitHub storage not configured, returning empty list")
+      console.log("[v0] Missing:", !token ? "GITHUB_TOKEN" : "", !owner ? "GITHUB_OWNER" : "")
       return NextResponse.json({
         success: true,
         reports: [],
         message: "GitHub storage not configured",
       })
     }
+
+    console.log("[v0] GitHub configured - Owner:", owner, "Repo:", repo)
 
     const githubUrl = `https://api.github.com/repos/${owner}/${repo}/contents/reports`
 
@@ -66,6 +73,7 @@ export async function GET() {
         timestamp,
         uploadDate: timestamp,
         url: file.html_url,
+        displayName: `${propertyName} (${new Date(timestamp.replace(/-/g, ":")).toLocaleDateString()})`,
       }
     })
 
