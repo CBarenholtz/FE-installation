@@ -595,9 +595,7 @@ function ReportView({
       alert(
         `Report saved successfully!\nProperty: ${customerInfo.propertyName}\nSaved at: ${new Date().toLocaleString()}\n\nTip: Use 'Export Backup' to create a permanent backup file.`,
       )
-      setTimeout(() => {
-        onBack()
-      }, 100)
+      onBack()
     } catch (error) {
       console.error("[v0] Error saving report:", error)
       alert("Error saving report. Please try again.")
