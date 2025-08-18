@@ -1,27 +1,22 @@
 import { type NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest) {
-  console.log("[v0] Save route called - using Supabase cloud storage")
-
   try {
+    console.log("[v0] Save route called - using Supabase cloud storage")
+
     const body = await request.json()
     console.log("[v0] Request body received:", !!body)
 
-    const supabaseUrl = process.env.SUPABASE_URL
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-    if (!supabaseUrl || !supabaseKey) {
-      console.error("[v0] Missing Supabase environment variables")
-      return NextResponse.json({ error: "Missing Supabase configuration" }, { status: 500 })
-    }
-
-    // Generate unique ID and timestamp
+    // Generate report metadata using same pattern as list route
     const reportId = crypto.randomUUID()
     const timestamp = new Date().toISOString()
+    const propertyName = body.customerInfo?.propertyName || "Unknown Property"
+    const title = `${propertyName.replace(/\s+/g, "-")}_${Date.now()}`
 
-    // Prepare report data for database
+    // Prepare report data using same structure as list route expects
     const reportData = {
       id: reportId,
+      title: title,
       data: body,
       created_at: timestamp,
       updated_at: timestamp,
@@ -29,21 +24,20 @@ export async function POST(request: NextRequest) {
 
     console.log("[v0] Saving report to Supabase:", reportId)
 
-    // Save to Supabase
-    const saveResponse = await fetch(`${supabaseUrl}/rest/v1/reports`, {
+    // Use exact same fetch pattern as working list route
+    const response = await fetch(`${process.env.SUPABASE_URL}/rest/v1/reports`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${supabaseKey}`,
-        apikey: supabaseKey,
-        Prefer: "return=minimal",
+        Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+        apikey: process.env.SUPABASE_ANON_KEY!,
       },
       body: JSON.stringify(reportData),
     })
 
-    if (!saveResponse.ok) {
-      const errorText = await saveResponse.text()
-      console.error("[v0] Supabase save error:", saveResponse.status, errorText)
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error("[v0] Supabase save error:", response.status, errorText)
       return NextResponse.json({ error: "Failed to save to Supabase", details: errorText }, { status: 500 })
     }
 
