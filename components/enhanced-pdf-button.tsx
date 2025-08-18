@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { FileDown } from 'lucide-react'
+import { FileDown } from "lucide-react"
 import type { CustomerInfo, InstallationData, Note } from "@/lib/types"
 import { useReportContext } from "@/lib/report-context"
 // Import the formatNote function
-import { getAeratorDescription, formatNote } from "@/lib/utils/aerator-helpers"
+import { formatNote } from "@/lib/utils/aerator-helpers"
 import { getStoredNotes, getFinalNoteForUnit } from "@/lib/notes"
 
 interface EnhancedPdfButtonProps {
@@ -27,7 +27,7 @@ export default function EnhancedPdfButton({
   const [logoLoaded, setLogoLoaded] = useState(false)
   const [footerLoaded, setFooterLoaded] = useState(false)
   const [logoImage, setLogoImage] = useState<string | null>(null)
-  const [footerImage, setFooterImage: any] = useState<{ dataUrl: string; width: number; height: number } | null>(null)
+  const [footerImage, setFooterImage] = useState<{ dataUrl: string; width: number; height: number } | null>(null)
   const [signatureLoaded, setSignatureLoaded] = useState(false)
   const [signatureImage, setSignatureImage] = useState<string | null>(null)
   const [editedDetailNotes, setEditedDetailNotes] = useState<Record<string, string>>({})
@@ -435,6 +435,7 @@ export default function EnhancedPdfButton({
       })
 
       // Consolidate by unit using exact same logic as preview
+      let unitColumn: string | null = null
       for (const item of filteredInstallationData) {
         const unitValue = unitColumn ? item[unitColumn] : item.Unit
         const unitKey = String(unitValue || "").trim()
@@ -526,7 +527,7 @@ export default function EnhancedPdfButton({
       }
 
       // Find the unit column first
-      const unitColumn = findUnitColumn(installationData)
+      unitColumn = findUnitColumn(installationData)
       console.log("PDF: Using unit column:", unitColumn)
 
       // Get the actual column names from the data - MOVE THIS TO THE TOP
@@ -1303,7 +1304,7 @@ export default function EnhancedPdfButton({
             showerADAQuantity: 0,
             showerRegularQuantity: 0,
             toiletQuantity: 0,
-            notes: []
+            notes: [],
           }
 
           // Kitchen display using consolidated data
