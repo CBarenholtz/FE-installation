@@ -1,5 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { supabaseServer } from "@/lib/supabase/server"
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,12 +13,24 @@ export async function GET(request: NextRequest) {
 
     console.log("[v0] Loading report with ID:", id)
 
-    const { data: report, error } = await supabaseServer.from("reports").select("data").eq("id", id).single()
+    const response = await fetch(`${process.env.SUPABASE_URL}/rest/v1/reports?select=data&id=eq.${id}`, {
+      headers: {
+        Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+        apikey: process.env.SUPABASE_ANON_KEY!,
+      },
+    })
 
-    if (error || !report) {
-      console.error("[v0] Supabase query error:", error)
+    if (!response.ok) {
+      console.error("[v0] Supabase query error:", await response.text())
       return NextResponse.json({ error: "Report not found" }, { status: 404 })
     }
+
+    const reports = await response.json()
+    if (!reports || reports.length === 0) {
+      return NextResponse.json({ error: "Report not found" }, { status: 404 })
+    }
+
+    const report = reports[0]
 
     console.log("[v0] Report loaded successfully from Supabase cloud storage")
 

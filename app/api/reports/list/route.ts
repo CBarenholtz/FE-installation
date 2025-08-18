@@ -1,18 +1,21 @@
 import { NextResponse } from "next/server"
-import { supabaseServer } from "@/lib/supabase/server"
 
 export async function GET() {
   try {
     console.log("[v0] List route called - using Supabase cloud storage")
 
-    const { data: reports, error } = await supabaseServer
-      .from("reports")
-      .select("id, title, created_at")
-      .order("created_at", { ascending: false })
-      .limit(15)
+    const response = await fetch(
+      `${process.env.SUPABASE_URL}/rest/v1/reports?select=id,title,created_at&order=created_at.desc&limit=15`,
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+          apikey: process.env.SUPABASE_ANON_KEY!,
+        },
+      },
+    )
 
-    if (error) {
-      console.error("[v0] Supabase query error:", error)
+    if (!response.ok) {
+      console.error("[v0] Supabase query error:", await response.text())
       return NextResponse.json({
         success: true,
         reports: [],
@@ -20,7 +23,9 @@ export async function GET() {
       })
     }
 
-    const formattedReports = reports.map((report) => {
+    const reports = await response.json()
+
+    const formattedReports = reports.map((report: any) => {
       const parts = report.title.split("_")
       const propertyName = parts[0].replace(/-/g, " ")
       const timestamp = report.created_at

@@ -1,5 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { supabaseServer } from "@/lib/supabase/server"
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,35 +16,60 @@ export async function POST(request: NextRequest) {
 
     console.log("[v0] Saving report to Supabase:", title)
 
-    const { data, error } = await supabaseServer
-      .from("reports")
-      .insert({
+    const insertResponse = await fetch(`${process.env.SUPABASE_URL}/rest/v1/reports`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+        apikey: process.env.SUPABASE_ANON_KEY!,
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({
         title,
         data: reportData,
-      })
-      .select()
-      .single()
+      }),
+    })
 
-    if (error) {
+    if (!insertResponse.ok) {
+      const error = await insertResponse.text()
       console.error("[v0] Supabase insert error:", error)
       return NextResponse.json({ error: "Failed to save report to database" }, { status: 500 })
     }
 
-    const { data: allReports, error: listError } = await supabaseServer
-      .from("reports")
-      .select("id, created_at")
-      .order("created_at", { ascending: false })
+    const [insertedReport] = await insertResponse.json()
 
-    if (!listError && allReports && allReports.length > 15) {
-      const reportsToDelete = allReports.slice(15)
-      const idsToDelete = reportsToDelete.map((report) => report.id)
+    const listResponse = await fetch(
+      `${process.env.SUPABASE_URL}/rest/v1/reports?select=id,created_at&order=created_at.desc`,
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+          apikey: process.env.SUPABASE_ANON_KEY!,
+        },
+      },
+    )
 
-      const { error: deleteError } = await supabaseServer.from("reports").delete().in("id", idsToDelete)
+    if (listResponse.ok) {
+      const allReports = await listResponse.json()
+      if (allReports && allReports.length > 15) {
+        const reportsToDelete = allReports.slice(15)
+        const idsToDelete = reportsToDelete.map((report: any) => report.id)
 
-      if (deleteError) {
-        console.warn("[v0] Cleanup failed:", deleteError)
-      } else {
-        console.log(`[v0] Deleted ${idsToDelete.length} old reports`)
+        const deleteResponse = await fetch(
+          `${process.env.SUPABASE_URL}/rest/v1/reports?id=in.(${idsToDelete.join(",")})`,
+          {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+              apikey: process.env.SUPABASE_ANON_KEY!,
+            },
+          },
+        )
+
+        if (!deleteResponse.ok) {
+          console.warn("[v0] Cleanup failed")
+        } else {
+          console.log(`[v0] Deleted ${idsToDelete.length} old reports`)
+        }
       }
     }
 
@@ -53,10 +77,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      id: data.id,
-      title: data.title,
+      id: insertedReport.id,
+      title: insertedReport.title,
       propertyName: sanitizedPropertyName,
-      timestamp: data.created_at,
+      timestamp: insertedReport.created_at,
       message: "Report saved successfully to cloud storage",
     })
   } catch (error) {
