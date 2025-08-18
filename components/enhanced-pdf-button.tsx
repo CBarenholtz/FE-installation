@@ -1337,7 +1337,7 @@ export default function EnhancedPdfButton({
           if (hasShowers) {
             const showerText = showerHead === "No Touch." ? "—" : showerHead
             if (showerText === "—") {
-              doc.text("\t—\t", columnPositions[colIndex], yPos)
+              doc.text("\t   \t", columnPositions[colIndex], yPos)
             } else {
               doc.text(showerText, columnPositions[colIndex], yPos)
             }

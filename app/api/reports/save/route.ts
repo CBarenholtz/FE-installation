@@ -1,23 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server"
 
-let put: any, list: any, del: any
-try {
-  const blobModule = await import("@vercel/blob")
-  put = blobModule.put
-  list = blobModule.list
-  del = blobModule.del
-  console.log("[v0] Vercel Blob SDK imported successfully")
-} catch (importError) {
-  console.error("[v0] Failed to import Vercel Blob SDK:", importError)
-}
-
 export async function POST(request: NextRequest) {
   try {
     console.log("[v0] Save route called")
 
-    if (!put || !list || !del) {
-      console.error("[v0] Vercel Blob SDK functions not available")
-      return NextResponse.json({ error: "Blob SDK not available" }, { status: 500 })
+    const token = process.env.BLOB_READ_WRITE_TOKEN
+    if (!token) {
+      console.error("[v0] Blob storage not configured")
+      return NextResponse.json({ error: "Blob storage not configured" }, { status: 500 })
     }
 
     const { reportData } = await request.json()
@@ -34,24 +24,47 @@ export async function POST(request: NextRequest) {
 
     console.log("[v0] Attempting to save to Blob storage:", filename)
 
-    const blob = await put(filename, JSON.stringify(reportData, null, 2), {
-      access: "public",
+    const uploadResponse = await fetch(`https://blob.vercel-storage.com/${filename}`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(reportData, null, 2),
     })
 
-    console.log("[v0] Report saved to Blob storage:", blob.url)
+    if (!uploadResponse.ok) {
+      throw new Error(`Upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`)
+    }
+
+    const uploadResult = await uploadResponse.json()
+    console.log("[v0] Report saved to Blob storage:", uploadResult.url)
 
     try {
-      const { blobs } = await list({ prefix: "reports/" })
-      const reportBlobs = blobs
-        .filter((b) => b.pathname.endsWith(".json"))
-        .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
+      const listResponse = await fetch("https://blob.vercel-storage.com/", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
 
-      if (reportBlobs.length > 15) {
-        const blobsToDelete = reportBlobs.slice(15)
-        console.log(`[v0] Cleaning up ${blobsToDelete.length} old reports`)
+      if (listResponse.ok) {
+        const { blobs } = await listResponse.json()
+        const reportBlobs = blobs
+          .filter((blob: any) => blob.pathname.startsWith("reports/") && blob.pathname.endsWith(".json"))
+          .sort((a: any, b: any) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
 
-        for (const blobToDelete of blobsToDelete) {
-          await del(blobToDelete.url)
+        if (reportBlobs.length > 15) {
+          const blobsToDelete = reportBlobs.slice(15)
+          console.log(`[v0] Cleaning up ${blobsToDelete.length} old reports`)
+
+          for (const blobToDelete of blobsToDelete) {
+            await fetch(blobToDelete.url, {
+              method: "DELETE",
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            })
+          }
         }
       }
     } catch (cleanupError) {
@@ -63,7 +76,7 @@ export async function POST(request: NextRequest) {
       filename: filename.split("/").pop(),
       propertyName: sanitizedPropertyName,
       timestamp,
-      url: blob.url,
+      url: uploadResult.url,
       message: "Report saved to cloud storage",
     })
   } catch (error) {
