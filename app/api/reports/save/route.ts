@@ -1,9 +1,24 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { put, list, del } from "@vercel/blob"
+
+let put: any, list: any, del: any
+try {
+  const blobModule = await import("@vercel/blob")
+  put = blobModule.put
+  list = blobModule.list
+  del = blobModule.del
+  console.log("[v0] Vercel Blob SDK imported successfully")
+} catch (importError) {
+  console.error("[v0] Failed to import Vercel Blob SDK:", importError)
+}
 
 export async function POST(request: NextRequest) {
   try {
     console.log("[v0] Save route called")
+
+    if (!put || !list || !del) {
+      console.error("[v0] Vercel Blob SDK functions not available")
+      return NextResponse.json({ error: "Blob SDK not available" }, { status: 500 })
+    }
 
     const { reportData } = await request.json()
 
@@ -15,22 +30,22 @@ export async function POST(request: NextRequest) {
     const propertyName = reportData.customerInfo.propertyName || "Unknown-Property"
     const sanitizedPropertyName = propertyName.replace(/[^a-zA-Z0-9-_]/g, "-")
     const windowsCompatibleTimestamp = timestamp.replace(/:/g, "-")
-    const filename = `${windowsCompatibleTimestamp}_${sanitizedPropertyName}.json`
+    const filename = `reports/${windowsCompatibleTimestamp}_${sanitizedPropertyName}.json`
 
-    const blob = await put(filename, JSON.stringify(reportData), {
+    console.log("[v0] Attempting to save to Blob storage:", filename)
+
+    const blob = await put(filename, JSON.stringify(reportData, null, 2), {
       access: "public",
     })
 
     console.log("[v0] Report saved to Blob storage:", blob.url)
 
-    // Clean up old reports - keep only 15 most recent
     try {
-      const { blobs } = await list()
+      const { blobs } = await list({ prefix: "reports/" })
       const reportBlobs = blobs
-        .filter((blob) => blob.pathname?.endsWith(".json"))
-        .sort((a, b) => b.pathname.localeCompare(a.pathname))
+        .filter((b) => b.pathname.endsWith(".json"))
+        .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
 
-      // Delete reports beyond the 15 most recent
       if (reportBlobs.length > 15) {
         const blobsToDelete = reportBlobs.slice(15)
         console.log(`[v0] Cleaning up ${blobsToDelete.length} old reports`)
@@ -45,14 +60,15 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      filename,
+      filename: filename.split("/").pop(),
       propertyName: sanitizedPropertyName,
       timestamp,
       url: blob.url,
-      message: "Report saved to Blob storage",
+      message: "Report saved to cloud storage",
     })
   } catch (error) {
     console.error("[v0] Error saving report:", error)
+    console.error("[v0] Error stack:", error instanceof Error ? error.stack : "No stack trace")
     return NextResponse.json(
       { error: "Failed to save report", details: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 },
