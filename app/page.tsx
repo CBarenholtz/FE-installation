@@ -429,11 +429,13 @@ function ReportView({
         alert(
           `Report saved successfully to cloud storage!\nProperty: ${data.propertyName}\nSaved at: ${new Date().toLocaleString()}`,
         )
-        onBack()
+        setTimeout(() => {
+          onBack()
+        }, 100)
       } else {
         const errorData = await response.json()
         console.error("[v0] Save error:", errorData)
-        alert("Error saving report. Please try again.")
+        alert(`Error saving report: ${errorData.details || "Please try again."}`)
       }
     } catch (error) {
       console.error("[v0] Error saving report:", error)
