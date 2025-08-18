@@ -51,8 +51,22 @@ function UploadForm() {
   const [isLoadingReports, setIsLoadingReports] = useState(false)
 
   useEffect(() => {
+    loadLocalReports()
     loadSavedReports()
   }, [])
+
+  const loadLocalReports = () => {
+    try {
+      const localReports = localStorage.getItem("savedReports")
+      if (localReports) {
+        const reports = JSON.parse(localReports)
+        setSavedReports(reports)
+        console.log("[v0] Loaded reports from localStorage:", reports.length)
+      }
+    } catch (error) {
+      console.error("[v0] Error loading local reports:", error)
+    }
+  }
 
   const loadSavedReports = async () => {
     try {
@@ -66,23 +80,92 @@ function UploadForm() {
           id: report.filename,
           propertyName: report.propertyName,
           timestamp: report.timestamp,
-          customerName: report.propertyName, // Using property name as customer name for now
+          customerName: report.propertyName,
           displayName: report.displayName,
           url: report.url,
         }))
 
-        setSavedReports(reports)
-        console.log("[v0] Loaded reports:", reports.length)
+        const localReports = localStorage.getItem("savedReports")
+        const existingReports = localReports ? JSON.parse(localReports) : []
+        const mergedReports = [
+          ...existingReports,
+          ...reports.filter((r: SavedReport) => !existingReports.some((er: SavedReport) => er.id === r.id)),
+        ]
+
+        setSavedReports(mergedReports)
+        localStorage.setItem("savedReports", JSON.stringify(mergedReports))
+        console.log("[v0] Loaded reports:", mergedReports.length)
       } else {
-        console.error("[v0] Failed to load reports:", response.status)
-        setSavedReports([])
+        console.log("[v0] Cloud storage unavailable, using localStorage only")
       }
     } catch (error) {
-      console.error("[v0] Error loading saved reports:", error)
-      setSavedReports([])
+      console.log("[v0] Cloud storage error, using localStorage only:", error)
     } finally {
       setIsLoadingReports(false)
     }
+  }
+
+  const handleExportReports = () => {
+    try {
+      const reportsData = localStorage.getItem("savedReports")
+      if (!reportsData) {
+        alert("No reports to export")
+        return
+      }
+
+      const reports = JSON.parse(reportsData)
+      const exportData = {
+        exportDate: new Date().toISOString(),
+        reportCount: reports.length,
+        reports: reports,
+      }
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `water-reports-backup-${new Date().toISOString().split("T")[0]}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+
+      alert(`Exported ${reports.length} reports successfully!`)
+    } catch (error) {
+      console.error("[v0] Export error:", error)
+      alert("Error exporting reports")
+    }
+  }
+
+  const handleImportReports = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      try {
+        const importData = JSON.parse(event.target?.result as string)
+        if (importData.reports && Array.isArray(importData.reports)) {
+          const existingReports = localStorage.getItem("savedReports")
+          const existing = existingReports ? JSON.parse(existingReports) : []
+
+          const mergedReports = [
+            ...existing,
+            ...importData.reports.filter((r: SavedReport) => !existing.some((er: SavedReport) => er.id === r.id)),
+          ]
+
+          localStorage.setItem("savedReports", JSON.stringify(mergedReports))
+          setSavedReports(mergedReports)
+          alert(`Imported ${importData.reports.length} reports successfully!`)
+        } else {
+          alert("Invalid backup file format")
+        }
+      } catch (error) {
+        console.error("[v0] Import error:", error)
+        alert("Error importing reports")
+      }
+    }
+    reader.readAsText(file)
   }
 
   const handleLoadReport = async () => {
@@ -92,9 +175,32 @@ function UploadForm() {
       setIsProcessing(true)
       console.log("[v0] Loading report:", selectedReport)
 
-      const report = savedReports.find((r) => r.id === selectedReport)
-      if (!report) {
-        alert("Report not found")
+      const localReportData = localStorage.getItem(`report_${selectedReport}`)
+      if (localReportData) {
+        const reportData = JSON.parse(localReportData)
+
+        if (reportData.customerInfo) {
+          localStorage.setItem("customerInfo", JSON.stringify(reportData.customerInfo))
+        }
+        if (reportData.installationData) {
+          localStorage.setItem("installationData", JSON.stringify(reportData.installationData))
+          localStorage.setItem("rawInstallationData", JSON.stringify(reportData.installationData))
+        }
+        if (reportData.toiletCount) {
+          localStorage.setItem("toiletCount", JSON.stringify(reportData.toiletCount))
+        }
+        if (reportData.reportImages) {
+          localStorage.setItem("reportImages", JSON.stringify(reportData.reportImages))
+        }
+        if (reportData.reportNotes) {
+          localStorage.setItem("reportNotes", JSON.stringify(reportData.reportNotes))
+        }
+        if (reportData.coverImage) {
+          localStorage.setItem("coverImage", reportData.coverImage)
+        }
+
+        console.log("[v0] Report loaded from localStorage")
+        window.location.reload()
         return
       }
 
@@ -124,7 +230,7 @@ function UploadForm() {
           localStorage.setItem("coverImage", reportData.coverImage)
         }
 
-        console.log("[v0] Report loaded successfully")
+        console.log("[v0] Report loaded from cloud storage")
         window.location.reload()
       } else {
         alert("Error loading report. Please try again.")
@@ -215,31 +321,57 @@ function UploadForm() {
             {isLoadingReports ? (
               <p className="text-gray-600">Loading saved reports...</p>
             ) : savedReports.length > 0 ? (
-              <div className="flex gap-3 items-end">
-                <div className="flex-1">
-                  <Label htmlFor="savedReport">Select a recent report to load</Label>
-                  <Select value={selectedReport} onValueChange={setSelectedReport}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose a saved report..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {savedReports.map((report) => (
-                        <SelectItem key={report.id} value={report.id}>
-                          {report.displayName}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              <div className="space-y-3">
+                <div className="flex gap-3 items-end">
+                  <div className="flex-1">
+                    <Label htmlFor="savedReport">Select a recent report to load</Label>
+                    <Select value={selectedReport} onValueChange={setSelectedReport}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choose a saved report..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {savedReports.map((report) => (
+                          <SelectItem key={report.id} value={report.id}>
+                            {report.displayName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    onClick={handleLoadReport}
+                    disabled={!selectedReport || isProcessing}
+                    variant="outline"
+                    className="flex items-center gap-2 bg-transparent"
+                  >
+                    <Download className="h-4 w-4" />
+                    {isProcessing ? "Loading..." : "Load Report"}
+                  </Button>
                 </div>
-                <Button
-                  onClick={handleLoadReport}
-                  disabled={!selectedReport || isProcessing}
-                  variant="outline"
-                  className="flex items-center gap-2 bg-transparent"
-                >
-                  <Download className="h-4 w-4" />
-                  {isProcessing ? "Loading..." : "Load Report"}
-                </Button>
+
+                <div className="flex gap-2 pt-2 border-t">
+                  <Button
+                    onClick={handleExportReports}
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-2 bg-transparent"
+                  >
+                    <Download className="h-3 w-3" />
+                    Export Backup
+                  </Button>
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept=".json"
+                      onChange={handleImportReports}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    <Button variant="outline" size="sm" className="flex items-center gap-2 bg-transparent">
+                      <Upload className="h-3 w-3" />
+                      Import Backup
+                    </Button>
+                  </div>
+                </div>
               </div>
             ) : (
               <p className="text-gray-600">No saved reports found. Generate and save a report to see it here.</p>
@@ -401,7 +533,7 @@ function ReportView({
   const handleSaveReport = async () => {
     try {
       setIsSaving(true)
-      console.log("[v0] Saving report using reliable file system approach")
+      console.log("[v0] Saving report to localStorage (primary) and cloud storage (backup)")
 
       const reportData = {
         customerInfo,
@@ -416,25 +548,56 @@ function ReportView({
         signatureTitle: localStorage.getItem("signatureTitle"),
       }
 
-      const response = await fetch("/api/reports/save", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ reportData }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        alert(`Report saved successfully!\nProperty: ${data.propertyName}\nSaved at: ${new Date().toLocaleString()}`)
-        setTimeout(() => {
-          onBack()
-        }, 100)
-      } else {
-        const errorData = await response.json()
-        console.error("[v0] Save error:", errorData)
-        alert(`Error saving report: ${errorData.details || "Please try again."}`)
+      const reportId = `report_${Date.now()}_${customerInfo.propertyName.replace(/[^a-zA-Z0-9]/g, "_")}`
+      const reportMetadata = {
+        id: reportId,
+        propertyName: customerInfo.propertyName,
+        timestamp: new Date().toISOString(),
+        customerName: customerInfo.customerName,
+        displayName: `${customerInfo.propertyName} - ${new Date().toLocaleDateString()}`,
       }
+
+      localStorage.setItem(`report_${reportId}`, JSON.stringify(reportData))
+
+      const existingReports = localStorage.getItem("savedReports")
+      const reports = existingReports ? JSON.parse(existingReports) : []
+      reports.unshift(reportMetadata)
+
+      if (reports.length > 15) {
+        const removedReports = reports.splice(15)
+        removedReports.forEach((report: SavedReport) => {
+          localStorage.removeItem(`report_${report.id}`)
+        })
+      }
+
+      localStorage.setItem("savedReports", JSON.stringify(reports))
+
+      console.log("[v0] Report saved to localStorage successfully")
+
+      try {
+        const response = await fetch("/api/reports/save", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ reportData }),
+        })
+
+        if (response.ok) {
+          console.log("[v0] Report also backed up to cloud storage")
+        } else {
+          console.log("[v0] Cloud backup failed, but localStorage save succeeded")
+        }
+      } catch (cloudError) {
+        console.log("[v0] Cloud backup unavailable, but localStorage save succeeded")
+      }
+
+      alert(
+        `Report saved successfully!\nProperty: ${customerInfo.propertyName}\nSaved at: ${new Date().toLocaleString()}\n\nTip: Use 'Export Backup' to create a permanent backup file.`,
+      )
+      setTimeout(() => {
+        onBack()
+      }, 100)
     } catch (error) {
       console.error("[v0] Error saving report:", error)
       alert("Error saving report. Please try again.")
