@@ -49,22 +49,6 @@ export async function POST(request: NextRequest) {
 
     console.log("[v0] Report saved successfully to Supabase")
 
-    // Clean up old reports (keep only 15 most recent)
-    console.log("[v0] Cleaning up old reports")
-    const cleanupResponse = await fetch(`${supabaseUrl}/rest/v1/rpc/cleanup_old_reports`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${supabaseKey}`,
-        apikey: supabaseKey,
-      },
-      body: JSON.stringify({ keep_count: 15 }),
-    })
-
-    if (!cleanupResponse.ok) {
-      console.warn("[v0] Cleanup warning (non-critical):", cleanupResponse.status)
-    }
-
     return NextResponse.json({
       success: true,
       message: "Report saved to Supabase cloud storage successfully",
