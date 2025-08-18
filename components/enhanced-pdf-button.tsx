@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { FileDown } from "lucide-react"
+import { FileDown } from 'lucide-react'
 import type { CustomerInfo, InstallationData, Note } from "@/lib/types"
 import { useReportContext } from "@/lib/report-context"
 // Import the formatNote function
@@ -27,7 +27,7 @@ export default function EnhancedPdfButton({
   const [logoLoaded, setLogoLoaded] = useState(false)
   const [footerLoaded, setFooterLoaded] = useState(false)
   const [logoImage, setLogoImage] = useState<string | null>(null)
-  const [footerImage, setFooterImage] = useState<{ dataUrl: string; width: number; height: number } | null>(null)
+  const [footerImage, setFooterImage: any] = useState<{ dataUrl: string; width: number; height: number } | null>(null)
   const [signatureLoaded, setSignatureLoaded] = useState(false)
   const [signatureImage, setSignatureImage] = useState<string | null>(null)
   const [editedDetailNotes, setEditedDetailNotes] = useState<Record<string, string>>({})
@@ -357,14 +357,153 @@ export default function EnhancedPdfButton({
       return firstKey
     }
 
-    if (!jsPDFLoaded || !logoLoaded || !footerLoaded) {
-      alert("PDF generator or images are still loading. Please try again in a moment.")
+    if (!jsPDFLoaded || !logoLoaded || !footerLoaded || !signatureLoaded) {
+      alert("PDF generation is still loading. Please try again in a moment.")
       return
     }
 
     try {
       setIsGenerating(true)
-      console.log("Starting enhanced PDF generation...")
+      console.log("Starting PDF generation...")
+
+      const consolidatedData: Record<
+        string,
+        {
+          unit: string
+          kitchenQuantity: number
+          bathroomQuantity: number
+          showerADAQuantity: number
+          showerRegularQuantity: number
+          toiletQuantity: number
+          notes: string[]
+        }
+      > = {}
+
+      // Helper function to find specific quantity columns (same as preview)
+      const findSpecificColumns = () => {
+        if (!installationData.length) return {}
+
+        const firstItem = installationData[0]
+        const keys = Object.keys(firstItem)
+
+        const columns = {
+          kitchenAerator: keys.find((key) => {
+            const lowerKey = key.toLowerCase()
+            return lowerKey.includes("kitchen") && lowerKey.includes("aerator")
+          }),
+          bathroomAeratorGuest: keys.find((key) => {
+            const lowerKey = key.toLowerCase()
+            return lowerKey.includes("bathroom") && lowerKey.includes("aerator") && lowerKey.includes("guest")
+          }),
+          bathroomAeratorMaster: keys.find((key) => {
+            const lowerKey = key.toLowerCase()
+            return lowerKey.includes("bathroom") && lowerKey.includes("aerator") && lowerKey.includes("master")
+          }),
+          adaShowerHead: keys.find((key) => {
+            const lowerKey = key.toLowerCase()
+            return lowerKey.includes("ada") && lowerKey.includes("shower")
+          }),
+          regularShowerHead: keys.find((key) => {
+            const lowerKey = key.toLowerCase()
+            return (
+              lowerKey.includes("shower") &&
+              (lowerKey.includes("head") || lowerKey === "showerhead") &&
+              !lowerKey.includes("ada")
+            )
+          }),
+          toiletInstalled: keys.find((key) => {
+            const lowerKey = key.toLowerCase()
+            return lowerKey.includes("toilet") && lowerKey.includes("install")
+          }),
+        }
+
+        return columns
+      }
+
+      const specificColumns = findSpecificColumns()
+
+      // Process installation data using same logic as preview
+      const filteredInstallationData = installationData.filter((item) => {
+        const unitValue = unitColumn ? item[unitColumn] : item.Unit
+        if (!unitValue || String(unitValue).trim() === "") return false
+
+        const trimmedUnit = String(unitValue).trim()
+        const lowerUnit = trimmedUnit.toLowerCase()
+        const invalidValues = ["total", "sum", "average", "avg", "count", "header"]
+
+        return !invalidValues.some((val) => lowerUnit === val || lowerUnit.includes(val))
+      })
+
+      // Consolidate by unit using exact same logic as preview
+      for (const item of filteredInstallationData) {
+        const unitValue = unitColumn ? item[unitColumn] : item.Unit
+        const unitKey = String(unitValue || "").trim()
+
+        if (!unitKey) continue
+
+        if (!consolidatedData[unitKey]) {
+          consolidatedData[unitKey] = {
+            unit: unitKey,
+            kitchenQuantity: 0,
+            bathroomQuantity: 0,
+            showerADAQuantity: 0,
+            showerRegularQuantity: 0,
+            toiletQuantity: 0,
+            notes: [],
+          }
+        }
+
+        // Kitchen: Always 1 if kitchen aerator column has data
+        if (specificColumns.kitchenAerator && item[specificColumns.kitchenAerator]) {
+          const kitchenValue = String(item[specificColumns.kitchenAerator]).trim()
+          if (kitchenValue && kitchenValue !== "" && kitchenValue !== "0") {
+            consolidatedData[unitKey].kitchenQuantity = 1
+          }
+        }
+
+        // Bathroom: Count guest + master columns
+        let bathroomCount = 0
+        if (specificColumns.bathroomAeratorGuest && item[specificColumns.bathroomAeratorGuest]) {
+          const guestValue = String(item[specificColumns.bathroomAeratorGuest]).trim()
+          if (guestValue && guestValue !== "" && guestValue !== "0") {
+            bathroomCount += 1
+          }
+        }
+        if (specificColumns.bathroomAeratorMaster && item[specificColumns.bathroomAeratorMaster]) {
+          const masterValue = String(item[specificColumns.bathroomAeratorMaster]).trim()
+          if (masterValue && masterValue !== "" && masterValue !== "0") {
+            bathroomCount += 1
+          }
+        }
+        consolidatedData[unitKey].bathroomQuantity = bathroomCount
+
+        // Shower: Read actual quantities from both columns
+        if (specificColumns.adaShowerHead && item[specificColumns.adaShowerHead]) {
+          const adaQuantity = Number.parseInt(String(item[specificColumns.adaShowerHead])) || 0
+          consolidatedData[unitKey].showerADAQuantity = adaQuantity
+        }
+        if (specificColumns.regularShowerHead && item[specificColumns.regularShowerHead]) {
+          const regularQuantity = Number.parseInt(String(item[specificColumns.regularShowerHead])) || 0
+          consolidatedData[unitKey].showerRegularQuantity = regularQuantity
+        }
+
+        // Toilet: Read direct quantity from toilets installed column
+        if (specificColumns.toiletInstalled && item[specificColumns.toiletInstalled]) {
+          const toiletQuantity = Number.parseInt(String(item[specificColumns.toiletInstalled])) || 0
+          consolidatedData[unitKey].toiletQuantity = toiletQuantity
+        }
+
+        // Collect notes
+        const unitNotes = []
+        if (item["Leak Issue Kitchen Faucet"]) unitNotes.push("Kitchen faucet leak")
+        if (item["Leak Issue Bath Faucet"]) unitNotes.push("Bathroom faucet leak")
+        if (item["Tub Spout/Diverter Leak Issue"])
+          unitNotes.push(`${item["Tub Spout/Diverter Leak Issue"]} leak from tub`)
+        if (item.Notes) unitNotes.push(item.Notes)
+
+        consolidatedData[unitKey].notes.push(...unitNotes)
+      }
+
       console.log("Using context values:", {
         reportTitle,
         letterText,
@@ -1158,34 +1297,54 @@ export default function EnhancedPdfButton({
           // Update the PDF generation to use edited installation values
           // In the section where you write data to PDF, update the kitchen, bathroom, shower, and toilet values
 
-          // Replace the kitchenAerator calculation with:
+          const consolidated = consolidatedData[originalUnitValue] || {
+            kitchenQuantity: 0,
+            bathroomQuantity: 0,
+            showerADAQuantity: 0,
+            showerRegularQuantity: 0,
+            toiletQuantity: 0,
+            notes: []
+          }
+
+          // Kitchen display using consolidated data
           const kitchenAerator =
-            isSpecialUnit || !kitchenAeratorColumn
-              ? ""
-              : unitColumn && item[unitColumn] && latestEditedInstallations[item[unitColumn]]?.kitchen !== undefined
-                ? latestEditedInstallations[item[unitColumn]].kitchen
-                : getAeratorDescription(item[kitchenAeratorColumn] || "", "kitchen")
+            originalUnitValue && latestEditedInstallations[originalUnitValue]?.kitchen !== undefined
+              ? latestEditedInstallations[originalUnitValue].kitchen
+              : consolidated.kitchenQuantity > 0
+                ? "1.0 GPM (1)"
+                : "No Touch."
 
-          // Replace the bathroomAerator calculation with:
-          const bathroomAerator = !bathroomAeratorColumn
-            ? ""
-            : unitColumn && item[unitColumn] && latestEditedInstallations[item[unitColumn]]?.bathroom !== undefined
-              ? latestEditedInstallations[item[unitColumn]].bathroom
-              : getAeratorDescription(item[bathroomAeratorColumn] || "", "bathroom")
+          // Bathroom display using consolidated data
+          const bathroomAerator =
+            originalUnitValue && latestEditedInstallations[originalUnitValue]?.bathroom !== undefined
+              ? latestEditedInstallations[originalUnitValue].bathroom
+              : consolidated.bathroomQuantity > 0
+                ? `1.0 GPM (${consolidated.bathroomQuantity})`
+                : "No Touch."
 
-          // Replace the showerHead calculation with:
-          const showerHead = !showerHeadColumn
-            ? ""
-            : unitColumn && item[unitColumn] && latestEditedInstallations[item[unitColumn]]?.shower !== undefined
-              ? latestEditedInstallations[item[unitColumn]].shower
-              : getAeratorDescription(item[showerHeadColumn] || "", "shower")
+          // Shower display using consolidated data
+          const showerHead = (() => {
+            if (originalUnitValue && latestEditedInstallations[originalUnitValue]?.shower !== undefined) {
+              return latestEditedInstallations[originalUnitValue].shower
+            }
 
-          // Replace the toilet calculation with:
+            const parts = []
+            if (consolidated.showerRegularQuantity > 0) {
+              parts.push(`1.75 GPM (${consolidated.showerRegularQuantity})`)
+            }
+            if (consolidated.showerADAQuantity > 0) {
+              parts.push(`1.5 GPM (${consolidated.showerADAQuantity})`)
+            }
+
+            return parts.length > 0 ? parts.join("; ") : "No Touch."
+          })()
+
+          // Toilet display using consolidated data
           const toilet =
-            unitColumn && item[unitColumn] && latestEditedInstallations[item[unitColumn]]?.toilet !== undefined
-              ? latestEditedInstallations[item[unitColumn]].toilet
-              : hasToiletInstalled(item)
-                ? "0.8 GPF"
+            originalUnitValue && latestEditedInstallations[originalUnitValue]?.toilet !== undefined
+              ? latestEditedInstallations[originalUnitValue].toilet
+              : consolidated.toiletQuantity > 0
+                ? `0.8 GPF (${consolidated.toiletQuantity})`
                 : ""
 
           // Update the notes compilation in the PDF generation
@@ -1337,7 +1496,7 @@ export default function EnhancedPdfButton({
           if (hasShowers) {
             const showerText = showerHead === "No Touch." ? "—" : showerHead
             if (showerText === "—") {
-              doc.text("\t   \t", columnPositions[colIndex], yPos)
+              doc.text("\t—\t", columnPositions[colIndex], yPos)
             } else {
               doc.text(showerText, columnPositions[colIndex], yPos)
             }

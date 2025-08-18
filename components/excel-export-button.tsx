@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { FileSpreadsheet } from "lucide-react"
 import type { CustomerInfo, InstallationData, Note } from "@/lib/types"
-import { getAeratorDescription } from "@/lib/utils/aerator-helpers"
 import { getStoredNotes } from "@/lib/notes"
 
 interface ExcelExportButtonProps {
@@ -65,78 +64,75 @@ export default function ExcelExportButton({
         console.error("Excel: Error loading pictures data:", error)
       }
 
-      // Find column names (same logic as PDF)
-      const findColumnName = (possibleNames: string[]): string | null => {
-        if (!installationData || installationData.length === 0) return null
-
-        const matchingColumns: { key: string; dataCount: number }[] = []
-
-        for (const key of Object.keys(installationData[0])) {
-          let isMatch = false
-
-          // Check for exact match or partial match
-          for (const possibleName of possibleNames) {
-            if (
-              key.toLowerCase() === possibleName.toLowerCase() ||
-              key.toLowerCase().includes(possibleName.toLowerCase()) ||
-              possibleName.toLowerCase().includes(key.toLowerCase())
-            ) {
-              isMatch = true
-              break
-            }
-          }
-
-          if (isMatch) {
-            const dataCount = installationData
-              .map((item) => item[key])
-              .filter((value) => {
-                if (!value) return false
-                const trimmed = String(value).trim().toLowerCase()
-                return trimmed !== "" && trimmed !== "0" && trimmed !== "no" && trimmed !== "n/a"
-              }).length
-
-            matchingColumns.push({ key, dataCount })
-          }
-        }
-
-        if (matchingColumns.length === 0) return null
-        matchingColumns.sort((a, b) => b.dataCount - a.dataCount)
-        return matchingColumns[0].key
-      }
-
       const findUnitColumn = (data: InstallationData[]): string | null => {
         if (!data || data.length === 0) return null
-        const item = data[0]
+        const firstItem = data[0]
+        const keys = Object.keys(firstItem)
 
-        // Look for unit-related columns
-        for (const key of Object.keys(item)) {
-          const keyLower = key.toLowerCase()
-          if (keyLower === "bldg/unit" || keyLower.includes("unit") || keyLower.includes("apt")) {
-            return key
-          }
+        // Look for "Unit" column first
+        if (keys.includes("Unit")) return "Unit"
+
+        // Look for any column containing "unit"
+        for (const key of keys) {
+          if (key.toLowerCase().includes("unit")) return key
         }
-        return Object.keys(item)[0] // Fallback to first column
+
+        // Fallback to first column
+        return keys[0]
+      }
+
+      const findSpecificColumns = () => {
+        if (!installationData.length) return {}
+
+        const firstItem = installationData[0]
+        const keys = Object.keys(firstItem)
+
+        const columns = {
+          // Kitchen aerator column (for type, quantity always 1 if exists)
+          kitchenAerator: keys.find((key) => {
+            const lowerKey = key.toLowerCase()
+            return lowerKey.includes("kitchen") && lowerKey.includes("aerator")
+          }),
+
+          // Bathroom aerator columns (count both guest and master)
+          bathroomAeratorGuest: keys.find((key) => {
+            const lowerKey = key.toLowerCase()
+            return lowerKey.includes("bathroom") && lowerKey.includes("aerator") && lowerKey.includes("guest")
+          }),
+          bathroomAeratorMaster: keys.find((key) => {
+            const lowerKey = key.toLowerCase()
+            return lowerKey.includes("bathroom") && lowerKey.includes("aerator") && lowerKey.includes("master")
+          }),
+
+          // Shower columns (read actual quantities)
+          adaShowerHead: keys.find((key) => {
+            const lowerKey = key.toLowerCase()
+            return lowerKey.includes("ada") && lowerKey.includes("shower")
+          }),
+          regularShowerHead: keys.find((key) => {
+            const lowerKey = key.toLowerCase()
+            return (
+              lowerKey.includes("shower") &&
+              (lowerKey.includes("head") || lowerKey === "showerhead") &&
+              !lowerKey.includes("ada")
+            )
+          }),
+
+          // Toilet installation column (read direct quantity)
+          toiletInstalled: keys.find((key) => {
+            const lowerKey = key.toLowerCase()
+            return lowerKey.includes("toilet") && lowerKey.includes("install")
+          }),
+        }
+
+        console.log("Excel: Found specific columns:", columns)
+        return columns
       }
 
       const unitColumn = findUnitColumn(installationData)
-      const kitchenAeratorColumn = findColumnName(["Kitchen Aerator", "kitchen aerator", "kitchen"])
-      const bathroomAeratorColumn = findColumnName(["Bathroom aerator", "bathroom aerator", "bathroom"])
-      const showerHeadColumn = findColumnName(["Shower Head", "shower head", "shower"])
+      const specificColumns = findSpecificColumns()
 
-      // Consolidate installations by unit (same logic as PDF)
-      const consolidatedData = new Map<
-        string,
-        {
-          unit: string
-          kitchenCount: number
-          bathroomCount: number
-          showerCount: number
-          toiletCount: number
-          notes: string[]
-        }
-      >()
-
-      // Filter and process data
+      // Filter and process data using the same logic as preview
       const filteredData = installationData.filter((item) => {
         const unitValue = unitColumn ? item[unitColumn] : item.Unit
         if (!unitValue || String(unitValue).trim() === "") return false
@@ -148,39 +144,78 @@ export default function ExcelExportButton({
         return !invalidValues.some((val) => lowerUnit === val || lowerUnit.includes(val))
       })
 
-      // Consolidate installations by unit
-      filteredData.forEach((item) => {
+      // Consolidate installations by unit using exact same logic as preview
+      const consolidatedData: Record<
+        string,
+        {
+          unit: string
+          kitchenQuantity: number
+          bathroomQuantity: number
+          showerADAQuantity: number
+          showerRegularQuantity: number
+          toiletQuantity: number
+          notes: string[]
+        }
+      > = {}
+
+      // Process each row and consolidate by unit (same as preview)
+      for (const item of filteredData) {
         const unitValue = unitColumn ? item[unitColumn] : item.Unit
-        const finalUnit = latestEditedUnits[unitValue] !== undefined ? latestEditedUnits[unitValue] : unitValue
+        const unitKey = String(unitValue || "").trim()
 
-        if (!consolidatedData.has(finalUnit)) {
-          consolidatedData.set(finalUnit, {
-            unit: finalUnit,
-            kitchenCount: 0,
-            bathroomCount: 0,
-            showerCount: 0,
-            toiletCount: 0,
+        if (!unitKey) continue
+
+        // Initialize unit data if not exists
+        if (!consolidatedData[unitKey]) {
+          consolidatedData[unitKey] = {
+            unit: unitKey,
+            kitchenQuantity: 0,
+            bathroomQuantity: 0,
+            showerADAQuantity: 0,
+            showerRegularQuantity: 0,
+            toiletQuantity: 0,
             notes: [],
-          })
+          }
         }
 
-        const consolidated = consolidatedData.get(finalUnit)!
-
-        // Count installations
-        if (kitchenAeratorColumn && item[kitchenAeratorColumn] && item[kitchenAeratorColumn] !== "") {
-          consolidated.kitchenCount++
-        }
-        if (bathroomAeratorColumn && item[bathroomAeratorColumn] && item[bathroomAeratorColumn] !== "") {
-          consolidated.bathroomCount++
-        }
-        if (showerHeadColumn && item[showerHeadColumn] && item[showerHeadColumn] !== "") {
-          consolidated.showerCount++
+        // Kitchen: Always 1 if kitchen aerator column has data
+        if (specificColumns.kitchenAerator && item[specificColumns.kitchenAerator]) {
+          const kitchenValue = String(item[specificColumns.kitchenAerator]).trim()
+          if (kitchenValue && kitchenValue !== "" && kitchenValue !== "0") {
+            consolidatedData[unitKey].kitchenQuantity = 1
+          }
         }
 
-        // Check for toilet installation
-        const toiletColumn = Object.keys(item).find((key) => key.startsWith("Toilets Installed:"))
-        if (toiletColumn && item[toiletColumn] && item[toiletColumn] !== "") {
-          consolidated.toiletCount++
+        // Bathroom: Count guest + master columns (each counts as 1 if has data)
+        let bathroomCount = 0
+        if (specificColumns.bathroomAeratorGuest && item[specificColumns.bathroomAeratorGuest]) {
+          const guestValue = String(item[specificColumns.bathroomAeratorGuest]).trim()
+          if (guestValue && guestValue !== "" && guestValue !== "0") {
+            bathroomCount += 1
+          }
+        }
+        if (specificColumns.bathroomAeratorMaster && item[specificColumns.bathroomAeratorMaster]) {
+          const masterValue = String(item[specificColumns.bathroomAeratorMaster]).trim()
+          if (masterValue && masterValue !== "" && masterValue !== "0") {
+            bathroomCount += 1
+          }
+        }
+        consolidatedData[unitKey].bathroomQuantity = bathroomCount
+
+        // Shower: Read actual quantities from both columns
+        if (specificColumns.adaShowerHead && item[specificColumns.adaShowerHead]) {
+          const adaQuantity = Number.parseInt(String(item[specificColumns.adaShowerHead])) || 0
+          consolidatedData[unitKey].showerADAQuantity = adaQuantity
+        }
+        if (specificColumns.regularShowerHead && item[specificColumns.regularShowerHead]) {
+          const regularQuantity = Number.parseInt(String(item[specificColumns.regularShowerHead])) || 0
+          consolidatedData[unitKey].showerRegularQuantity = regularQuantity
+        }
+
+        // Toilet: Read direct quantity from toilets installed column
+        if (specificColumns.toiletInstalled && item[specificColumns.toiletInstalled]) {
+          const toiletQuantity = Number.parseInt(String(item[specificColumns.toiletInstalled])) || 0
+          consolidatedData[unitKey].toiletQuantity = toiletQuantity
         }
 
         // Collect notes
@@ -191,8 +226,8 @@ export default function ExcelExportButton({
           unitNotes.push(`${item["Tub Spout/Diverter Leak Issue"]} leak from tub`)
         if (item.Notes) unitNotes.push(item.Notes)
 
-        consolidated.notes.push(...unitNotes)
-      })
+        consolidatedData[unitKey].notes.push(...unitNotes)
+      }
 
       // Create workbook
       const XLSX = window.XLSX
@@ -210,7 +245,7 @@ export default function ExcelExportButton({
         [""],
         ["Installation Summary"],
         ["Total Toilets Installed", toiletCount],
-        ["Total Units Processed", consolidatedData.size],
+        ["Total Units Processed", Object.keys(consolidatedData).length],
       ]
 
       const summarySheet = XLSX.utils.aoa_to_sheet(summaryData)
@@ -229,7 +264,7 @@ export default function ExcelExportButton({
       const detailData = [detailHeaders]
 
       // Sort consolidated data by unit
-      const sortedUnits = Array.from(consolidatedData.values()).sort((a, b) => {
+      const sortedUnits = Object.values(consolidatedData).sort((a, b) => {
         const numA = Number.parseInt(a.unit)
         const numB = Number.parseInt(b.unit)
         if (!isNaN(numA) && !isNaN(numB)) return numA - numB
@@ -243,26 +278,39 @@ export default function ExcelExportButton({
         const kitchenDisplay =
           editedInstallation?.kitchen !== undefined
             ? editedInstallation.kitchen
-            : consolidated.kitchenCount > 0
-              ? getAeratorDescription(consolidated.kitchenCount.toString(), "kitchen")
+            : consolidated.kitchenQuantity > 0
+              ? "1.0 GPM (1)"
               : "No Touch."
 
         const bathroomDisplay =
           editedInstallation?.bathroom !== undefined
             ? editedInstallation.bathroom
-            : consolidated.bathroomCount > 0
-              ? getAeratorDescription(consolidated.bathroomCount.toString(), "bathroom")
+            : consolidated.bathroomQuantity > 0
+              ? `1.0 GPM (${consolidated.bathroomQuantity})`
               : "No Touch."
 
-        const showerDisplay =
-          editedInstallation?.shower !== undefined
-            ? editedInstallation.shower
-            : consolidated.showerCount > 0
-              ? getAeratorDescription(consolidated.showerCount.toString(), "shower")
-              : "No Touch."
+        const showerDisplay = (() => {
+          if (editedInstallation?.shower !== undefined) {
+            return editedInstallation.shower
+          }
+
+          const parts = []
+          if (consolidated.showerRegularQuantity > 0) {
+            parts.push(`1.75 GPM (${consolidated.showerRegularQuantity})`)
+          }
+          if (consolidated.showerADAQuantity > 0) {
+            parts.push(`1.5 GPM (${consolidated.showerADAQuantity})`)
+          }
+
+          return parts.length > 0 ? parts.join("; ") : "No Touch."
+        })()
 
         const toiletDisplay =
-          consolidated.toiletCount > 0 ? `We replaced ${consolidated.toiletCount > 1 ? "both toilets" : "toilet"}.` : ""
+          editedInstallation?.toilet !== undefined
+            ? editedInstallation.toilet
+            : consolidated.toiletQuantity > 0
+              ? `0.8 GPF (${consolidated.toiletQuantity})`
+              : ""
 
         // Get notes (edited notes take priority)
         const finalNotes = latestEditedNotes[consolidated.unit] || consolidated.notes.join(". ") || ""
@@ -270,10 +318,6 @@ export default function ExcelExportButton({
         detailData.push([consolidated.unit, kitchenDisplay, bathroomDisplay, showerDisplay, toiletDisplay, finalNotes])
       })
 
-      const detailSheet = XLSX.utils.aoa_to_sheet(detailData)
-      XLSX.utils.book_append_sheet(workbook, detailSheet, "Installation Details")
-
-      // Create notes sheet if there are notes
       if (notes.length > 0) {
         const notesData = [["Unit", "Notes"]]
         notes.forEach((note) => {
