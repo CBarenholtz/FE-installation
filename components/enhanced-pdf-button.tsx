@@ -366,6 +366,9 @@ export default function EnhancedPdfButton({
       setIsGenerating(true)
       console.log("Starting PDF generation...")
 
+      const unitColumn: string | null = findUnitColumn(installationData)
+      console.log("PDF: Using unit column:", unitColumn)
+
       const consolidatedData: Record<
         string,
         {
@@ -435,7 +438,6 @@ export default function EnhancedPdfButton({
       })
 
       // Consolidate by unit using exact same logic as preview
-      let unitColumn: string | null = null
       for (const item of filteredInstallationData) {
         const unitValue = unitColumn ? item[unitColumn] : item.Unit
         const unitKey = String(unitValue || "").trim()
@@ -526,9 +528,9 @@ export default function EnhancedPdfButton({
         console.error("PDF: Error loading pictures data:", error)
       }
 
-      // Find the unit column first
-      unitColumn = findUnitColumn(installationData)
-      console.log("PDF: Using unit column:", unitColumn)
+      // Find the unit column first - REMOVE THIS DUPLICATE DECLARATION
+      // unitColumn = findUnitColumn(installationData) // Remove duplicate declaration
+      // console.log("PDF: Using unit column:", unitColumn) // Remove duplicate log
 
       // Get the actual column names from the data - MOVE THIS TO THE TOP
       const kitchenAeratorColumn = findColumnName(["Kitchen Aerator", "kitchen aerator", "kitchen", "kitchen aerators"])
