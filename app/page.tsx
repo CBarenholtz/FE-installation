@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useEffect, useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -32,6 +31,18 @@ interface SavedReport {
   url?: string
 }
 
+function LoadingState() {
+  return (
+    <div className="flex items-center justify-center h-screen">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+    </div>
+  )
+}
+
+function NoDataState({ onBack }: { onBack: () => void }) {
+  return <UploadForm />
+}
+
 function UploadForm() {
   const router = useRouter()
   const [file, setFile] = useState<File | null>(null)
@@ -51,121 +62,37 @@ function UploadForm() {
   const [isLoadingReports, setIsLoadingReports] = useState(false)
 
   useEffect(() => {
-    loadLocalReports()
     loadSavedReports()
   }, [])
-
-  const loadLocalReports = () => {
-    try {
-      const localReports = localStorage.getItem("savedReports")
-      if (localReports) {
-        const reports = JSON.parse(localReports)
-        setSavedReports(reports)
-        console.log("[v0] Loaded reports from localStorage:", reports.length)
-      }
-    } catch (error) {
-      console.error("[v0] Error loading local reports:", error)
-    }
-  }
 
   const loadSavedReports = async () => {
     try {
       setIsLoadingReports(true)
-      console.log("[v0] Loading saved reports from cloud storage")
+      console.log("[v0] Loading saved reports from Supabase cloud storage")
       const response = await fetch("/api/reports/list")
 
       if (response.ok) {
         const data = await response.json()
         const reports = data.reports.map((report: any) => ({
-          id: report.filename,
-          propertyName: report.propertyName,
-          timestamp: report.timestamp,
-          customerName: report.propertyName,
-          displayName: report.displayName,
-          url: report.url,
+          id: report.id,
+          propertyName: report.property_name,
+          timestamp: report.created_at,
+          customerName: report.property_name,
+          displayName: `${report.property_name} - ${new Date(report.created_at).toLocaleDateString()}`,
         }))
 
-        const localReports = localStorage.getItem("savedReports")
-        const existingReports = localReports ? JSON.parse(localReports) : []
-        const mergedReports = [
-          ...existingReports,
-          ...reports.filter((r: SavedReport) => !existingReports.some((er: SavedReport) => er.id === r.id)),
-        ]
-
-        setSavedReports(mergedReports)
-        localStorage.setItem("savedReports", JSON.stringify(mergedReports))
-        console.log("[v0] Loaded reports:", mergedReports.length)
+        setSavedReports(reports)
+        console.log("[v0] Loaded reports from Supabase:", reports.length)
       } else {
-        console.log("[v0] Cloud storage unavailable, using localStorage only")
+        console.log("[v0] Error loading reports from Supabase")
+        setSavedReports([])
       }
     } catch (error) {
-      console.log("[v0] Cloud storage error, using localStorage only:", error)
+      console.log("[v0] Supabase error:", error)
+      setSavedReports([])
     } finally {
       setIsLoadingReports(false)
     }
-  }
-
-  const handleExportReports = () => {
-    try {
-      const reportsData = localStorage.getItem("savedReports")
-      if (!reportsData) {
-        alert("No reports to export")
-        return
-      }
-
-      const reports = JSON.parse(reportsData)
-      const exportData = {
-        exportDate: new Date().toISOString(),
-        reportCount: reports.length,
-        reports: reports,
-      }
-
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `water-reports-backup-${new Date().toISOString().split("T")[0]}.json`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-
-      alert(`Exported ${reports.length} reports successfully!`)
-    } catch (error) {
-      console.error("[v0] Export error:", error)
-      alert("Error exporting reports")
-    }
-  }
-
-  const handleImportReports = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      try {
-        const importData = JSON.parse(event.target?.result as string)
-        if (importData.reports && Array.isArray(importData.reports)) {
-          const existingReports = localStorage.getItem("savedReports")
-          const existing = existingReports ? JSON.parse(existingReports) : []
-
-          const mergedReports = [
-            ...existing,
-            ...importData.reports.filter((r: SavedReport) => !existing.some((er: SavedReport) => er.id === r.id)),
-          ]
-
-          localStorage.setItem("savedReports", JSON.stringify(mergedReports))
-          setSavedReports(mergedReports)
-          alert(`Imported ${importData.reports.length} reports successfully!`)
-        } else {
-          alert("Invalid backup file format")
-        }
-      } catch (error) {
-        console.error("[v0] Import error:", error)
-        alert("Error importing reports")
-      }
-    }
-    reader.readAsText(file)
   }
 
   const handleLoadReport = async () => {
@@ -173,42 +100,13 @@ function UploadForm() {
 
     try {
       setIsProcessing(true)
-      console.log("[v0] Loading report:", selectedReport)
-
-      const localReportData = localStorage.getItem(`report_${selectedReport}`)
-      if (localReportData) {
-        const reportData = JSON.parse(localReportData)
-
-        if (reportData.customerInfo) {
-          localStorage.setItem("customerInfo", JSON.stringify(reportData.customerInfo))
-        }
-        if (reportData.installationData) {
-          localStorage.setItem("installationData", JSON.stringify(reportData.installationData))
-          localStorage.setItem("rawInstallationData", JSON.stringify(reportData.installationData))
-        }
-        if (reportData.toiletCount) {
-          localStorage.setItem("toiletCount", JSON.stringify(reportData.toiletCount))
-        }
-        if (reportData.reportImages) {
-          localStorage.setItem("reportImages", JSON.stringify(reportData.reportImages))
-        }
-        if (reportData.reportNotes) {
-          localStorage.setItem("reportNotes", JSON.stringify(reportData.reportNotes))
-        }
-        if (reportData.coverImage) {
-          localStorage.setItem("coverImage", reportData.coverImage)
-        }
-
-        console.log("[v0] Report loaded from localStorage")
-        window.location.reload()
-        return
-      }
+      console.log("[v0] Loading report from Supabase:", selectedReport)
 
       const response = await fetch(`/api/reports/load?id=${selectedReport}`)
 
       if (response.ok) {
         const data = await response.json()
-        const reportData = data.reportData
+        const reportData = data.report_data
 
         if (reportData.customerInfo) {
           localStorage.setItem("customerInfo", JSON.stringify(reportData.customerInfo))
@@ -230,7 +128,7 @@ function UploadForm() {
           localStorage.setItem("coverImage", reportData.coverImage)
         }
 
-        console.log("[v0] Report loaded from cloud storage")
+        console.log("[v0] Report loaded from Supabase cloud storage")
         window.location.reload()
       } else {
         alert("Error loading report. Please try again.")
@@ -317,9 +215,9 @@ function UploadForm() {
           </div>
 
           <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-            <h2 className="text-lg font-semibold mb-3">Load Recent Report</h2>
+            <h2 className="text-lg font-semibold mb-3">Load Recent Report (15 Most Recent)</h2>
             {isLoadingReports ? (
-              <p className="text-gray-600">Loading saved reports...</p>
+              <p className="text-gray-600">Loading saved reports from cloud storage...</p>
             ) : savedReports.length > 0 ? (
               <div className="space-y-3">
                 <div className="flex gap-3 items-end">
@@ -347,30 +245,6 @@ function UploadForm() {
                     <Download className="h-4 w-4" />
                     {isProcessing ? "Loading..." : "Load Report"}
                   </Button>
-                </div>
-
-                <div className="flex gap-2 pt-2 border-t">
-                  <Button
-                    onClick={handleExportReports}
-                    variant="outline"
-                    size="sm"
-                    className="flex items-center gap-2 bg-transparent"
-                  >
-                    <Download className="h-3 w-3" />
-                    Export Backup
-                  </Button>
-                  <div className="relative">
-                    <input
-                      type="file"
-                      accept=".json"
-                      onChange={handleImportReports}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    />
-                    <Button variant="outline" size="sm" className="flex items-center gap-2 bg-transparent">
-                      <Upload className="h-3 w-3" />
-                      Import Backup
-                    </Button>
-                  </div>
                 </div>
               </div>
             ) : (
@@ -484,18 +358,6 @@ function UploadForm() {
   )
 }
 
-function LoadingState() {
-  return (
-    <div className="flex items-center justify-center h-screen">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-    </div>
-  )
-}
-
-function NoDataState({ onBack }: { onBack: () => void }) {
-  return <UploadForm />
-}
-
 function ReportView({
   customerInfo,
   installationData,
@@ -533,7 +395,7 @@ function ReportView({
   const handleSaveReport = async () => {
     try {
       setIsSaving(true)
-      console.log("[v0] Saving report to localStorage (primary) and cloud storage (backup)")
+      console.log("[v0] Saving report directly to Supabase cloud storage")
 
       const reportData = {
         customerInfo,
@@ -548,57 +410,28 @@ function ReportView({
         signatureTitle: localStorage.getItem("signatureTitle"),
       }
 
-      const reportId = `report_${Date.now()}_${customerInfo.propertyName.replace(/[^a-zA-Z0-9]/g, "_")}`
-      const reportMetadata = {
-        id: reportId,
-        propertyName: customerInfo.propertyName,
-        timestamp: new Date().toISOString(),
-        customerName: customerInfo.customerName,
-        displayName: `${customerInfo.propertyName} - ${new Date().toLocaleDateString()}`,
+      const response = await fetch("/api/reports/save", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ reportData }),
+      })
+
+      if (response.ok) {
+        console.log("[v0] Report saved to Supabase cloud storage successfully")
+        alert(
+          `Report saved to cloud storage!\nProperty: ${customerInfo.propertyName}\nSaved at: ${new Date().toLocaleString()}\n\nYour report is now accessible from any device.`,
+        )
+        setTimeout(() => {
+          onBack()
+        }, 100)
+      } else {
+        throw new Error("Failed to save to cloud storage")
       }
-
-      localStorage.setItem(`report_${reportId}`, JSON.stringify(reportData))
-
-      const existingReports = localStorage.getItem("savedReports")
-      const reports = existingReports ? JSON.parse(existingReports) : []
-      reports.unshift(reportMetadata)
-
-      if (reports.length > 15) {
-        const removedReports = reports.splice(15)
-        removedReports.forEach((report: SavedReport) => {
-          localStorage.removeItem(`report_${report.id}`)
-        })
-      }
-
-      localStorage.setItem("savedReports", JSON.stringify(reports))
-
-      console.log("[v0] Report saved to localStorage successfully")
-
-      try {
-        const response = await fetch("/api/reports/save", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ reportData }),
-        })
-
-        if (response.ok) {
-          console.log("[v0] Report also backed up to cloud storage")
-        } else {
-          console.log("[v0] Cloud backup failed, but localStorage save succeeded")
-        }
-      } catch (cloudError) {
-        console.log("[v0] Cloud backup unavailable, but localStorage save succeeded")
-      }
-
-      alert(
-        `Report saved successfully!\nProperty: ${customerInfo.propertyName}\nSaved at: ${new Date().toLocaleString()}\n\nTip: Use 'Export Backup' to create a permanent backup file.`,
-      )
-      onBack()
     } catch (error) {
       console.error("[v0] Error saving report:", error)
-      alert("Error saving report. Please try again.")
+      alert("Error saving report to cloud storage. Please try again.")
     } finally {
       setIsSaving(false)
     }
@@ -609,7 +442,7 @@ function ReportView({
 
     if (hasData) {
       const shouldSave = confirm(
-        "You have unsaved work. Would you like to save this report before going back?\n\nClick OK to save, or Cancel to discard changes.",
+        "You have unsaved work. Would you like to save this report to cloud storage before going back?\n\nClick OK to save, or Cancel to discard changes.",
       )
 
       if (shouldSave) {
@@ -633,7 +466,7 @@ function ReportView({
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={handleSaveReport} disabled={isSaving}>
             <Save className="mr-2 h-4 w-4" />
-            {isSaving ? "Saving..." : "Save Report"}
+            {isSaving ? "Saving to Cloud..." : "Save to Cloud"}
           </Button>
           <ExcelExportButton
             customerInfo={customerInfo}
@@ -727,7 +560,7 @@ function ReportContent() {
 
   const handleBack = () => {
     try {
-      console.log("[v0] Starting handleBack - clearing localStorage")
+      console.log("[v0] Starting handleBack - clearing all localStorage data")
 
       const itemsToRemove = [
         "installationData",
@@ -760,7 +593,7 @@ function ReportContent() {
       setToiletCount(0)
       setLoading(true)
 
-      console.log("[v0] localStorage cleared and state reset")
+      console.log("[v0] All localStorage data cleared and state reset")
     } catch (error) {
       console.error("[v0] Error in handleBack:", error)
       router.push("/")
@@ -769,7 +602,7 @@ function ReportContent() {
 
   const loadData = useCallback(() => {
     try {
-      console.log("[v0] Loading data from localStorage")
+      console.log("[v0] Loading data from localStorage for current session")
       const storedInstallationData = localStorage.getItem("installationData")
       const storedToiletCount = localStorage.getItem("toiletCount")
 
