@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { supabaseServer } from "@/lib/supabase/server"
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,30 +14,18 @@ export async function GET(request: NextRequest) {
 
     console.log("[v0] Loading report with ID:", id)
 
-    const token = process.env.BLOB_READ_WRITE_TOKEN
+    const { data: report, error } = await supabaseServer.from("reports").select("data").eq("id", id).single()
 
-    if (!token) {
-      console.log("[v0] Blob storage not configured for load operation")
-      return NextResponse.json({ error: "Blob storage not configured" }, { status: 500 })
+    if (error || !report) {
+      console.error("[v0] Supabase query error:", error)
+      return NextResponse.json({ error: "Report not found" }, { status: 404 })
     }
 
-    const response = await fetch(`https://blob.vercel-storage.com/${id}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch report: ${response.status} ${response.statusText}`)
-    }
-
-    const reportData = await response.json()
-
-    console.log("[v0] Report loaded successfully from Blob storage")
+    console.log("[v0] Report loaded successfully from Supabase cloud storage")
 
     return NextResponse.json({
       success: true,
-      reportData,
+      reportData: report.data,
     })
   } catch (error) {
     console.error("[v0] Error loading report:", error)

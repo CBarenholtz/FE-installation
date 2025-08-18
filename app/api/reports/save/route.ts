@@ -1,10 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { writeFile, readdir, unlink, mkdir } from "fs/promises"
-import { join } from "path"
+import { supabaseServer } from "@/lib/supabase/server"
 
 export async function POST(request: NextRequest) {
   try {
-    console.log("[v0] Save route called - using local file system (/tmp)")
+    console.log("[v0] Save route called - using Supabase cloud storage")
 
     const { reportData } = await request.json()
 
@@ -12,59 +11,53 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid report data" }, { status: 400 })
     }
 
-    const timestamp = new Date().toISOString()
     const propertyName = reportData.customerInfo.propertyName || "Unknown-Property"
     const sanitizedPropertyName = propertyName.replace(/[^a-zA-Z0-9-_]/g, "-")
-    const windowsCompatibleTimestamp = timestamp.replace(/:/g, "-")
-    const filename = `${windowsCompatibleTimestamp}_${sanitizedPropertyName}.json`
+    const title = `${sanitizedPropertyName}_${new Date().toISOString()}`
 
-    const reportsDir = join("/tmp", "reports")
-    const filePath = join(reportsDir, filename)
+    console.log("[v0] Saving report to Supabase:", title)
 
-    console.log("[v0] Saving report to local file system:", filePath)
+    const { data, error } = await supabaseServer
+      .from("reports")
+      .insert({
+        title,
+        data: reportData,
+      })
+      .select()
+      .single()
 
-    // Create reports directory if it doesn't exist
-    try {
-      await mkdir(reportsDir, { recursive: true })
-    } catch (error) {
-      // Directory might already exist, ignore error
+    if (error) {
+      console.error("[v0] Supabase insert error:", error)
+      return NextResponse.json({ error: "Failed to save report to database" }, { status: 500 })
     }
 
-    // Write the report file
-    await writeFile(filePath, JSON.stringify(reportData, null, 2), "utf8")
+    const { data: allReports, error: listError } = await supabaseServer
+      .from("reports")
+      .select("id, created_at")
+      .order("created_at", { ascending: false })
 
-    try {
-      const files = await readdir(reportsDir)
-      const reportFiles = files
-        .filter((file) => file.endsWith(".json"))
-        .map((file) => ({
-          name: file,
-          path: join(reportsDir, file),
-          timestamp: file.split("_")[0],
-        }))
-        .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+    if (!listError && allReports && allReports.length > 15) {
+      const reportsToDelete = allReports.slice(15)
+      const idsToDelete = reportsToDelete.map((report) => report.id)
 
-      // Keep only the 15 most recent reports
-      if (reportFiles.length > 15) {
-        const filesToDelete = reportFiles.slice(15)
-        for (const file of filesToDelete) {
-          await unlink(file.path)
-          console.log("[v0] Deleted old report:", file.name)
-        }
+      const { error: deleteError } = await supabaseServer.from("reports").delete().in("id", idsToDelete)
+
+      if (deleteError) {
+        console.warn("[v0] Cleanup failed:", deleteError)
+      } else {
+        console.log(`[v0] Deleted ${idsToDelete.length} old reports`)
       }
-    } catch (cleanupError) {
-      console.warn("[v0] Cleanup failed:", cleanupError)
     }
 
-    console.log("[v0] Report saved successfully to local file system")
-    console.warn("[v0] WARNING: Files in /tmp are temporary and will be lost between function calls!")
+    console.log("[v0] Report saved successfully to Supabase cloud storage")
 
     return NextResponse.json({
       success: true,
-      filename,
+      id: data.id,
+      title: data.title,
       propertyName: sanitizedPropertyName,
-      timestamp,
-      message: "Report saved successfully (temporary storage)",
+      timestamp: data.created_at,
+      message: "Report saved successfully to cloud storage",
     })
   } catch (error) {
     console.error("[v0] Error saving report:", error)
