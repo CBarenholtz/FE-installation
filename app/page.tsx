@@ -401,7 +401,7 @@ function ReportView({
   const handleSaveReport = async () => {
     try {
       setIsSaving(true)
-      console.log("[v0] Saving report to cloud storage")
+      console.log("[v0] Saving report using reliable file system approach")
 
       const reportData = {
         customerInfo,
@@ -426,9 +426,7 @@ function ReportView({
 
       if (response.ok) {
         const data = await response.json()
-        alert(
-          `Report saved successfully to cloud storage!\nProperty: ${data.propertyName}\nSaved at: ${new Date().toLocaleString()}`,
-        )
+        alert(`Report saved successfully!\nProperty: ${data.propertyName}\nSaved at: ${new Date().toLocaleString()}`)
         setTimeout(() => {
           onBack()
         }, 100)

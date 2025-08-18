@@ -1,41 +1,53 @@
 import { NextResponse } from "next/server"
-import { list } from "@vercel/blob"
+import { readdir } from "fs/promises"
+import { join } from "path"
 
 export async function GET() {
   try {
-    console.log("[v0] List route called")
+    console.log("[v0] List route called - using reliable file system approach")
 
-    const { blobs } = await list()
+    const reportsDir = join(process.cwd(), "data", "reports")
 
-    // Filter for JSON files and sort by pathname (which includes timestamp)
-    const reportBlobs = blobs
-      .filter((blob) => blob.pathname?.endsWith(".json"))
-      .sort((a, b) => b.pathname.localeCompare(a.pathname))
-      .slice(0, 15) // Get most recent 15 reports
+    try {
+      const files = await readdir(reportsDir)
+      const reportFiles = files
+        .filter((file) => file.endsWith(".json"))
+        .sort((a, b) => {
+          const timestampA = a.split("_")[0].replace(/-/g, ":")
+          const timestampB = b.split("_")[0].replace(/-/g, ":")
+          return new Date(timestampB).getTime() - new Date(timestampA).getTime()
+        })
+        .slice(0, 15)
 
-    const reports = reportBlobs.map((blob) => {
-      const filename = blob.pathname
-      const parts = filename.replace(".json", "").split("_")
-      const timestamp = parts[0]
-      const propertyName = parts.slice(1).join("_").replace(/-/g, " ")
+      const reports = reportFiles.map((filename) => {
+        const parts = filename.replace(".json", "").split("_")
+        const timestamp = parts[0].replace(/-/g, ":")
+        const propertyName = parts.slice(1).join("_").replace(/-/g, " ")
 
-      return {
-        filename,
-        propertyName,
-        timestamp,
-        uploadDate: blob.uploadedAt,
-        url: blob.url,
-        displayName: `${propertyName} (${new Date(timestamp.replace(/-/g, ":")).toLocaleDateString()})`,
-      }
-    })
+        return {
+          filename,
+          propertyName,
+          timestamp,
+          displayName: `${propertyName} (${new Date(timestamp).toLocaleDateString()})`,
+        }
+      })
 
-    console.log(`[v0] Found ${reports.length} reports in Blob storage`)
+      console.log(`[v0] Found ${reports.length} reports in file system`)
 
-    return NextResponse.json({
-      success: true,
-      reports,
-      message: `Found ${reports.length} reports`,
-    })
+      return NextResponse.json({
+        success: true,
+        reports,
+        message: `Found ${reports.length} reports`,
+      })
+    } catch (error) {
+      // Directory doesn't exist or is empty
+      console.log("[v0] No reports directory found, returning empty list")
+      return NextResponse.json({
+        success: true,
+        reports: [],
+        message: "No reports found",
+      })
+    }
   } catch (error) {
     console.error("[v0] Error listing reports:", error)
     return NextResponse.json(
