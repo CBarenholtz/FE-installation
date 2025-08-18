@@ -28,19 +28,24 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Upload to Vercel Blob using PUT request
-    const blobUrl = `https://blob.vercel-storage.com/${filename}`
-    const response = await fetch(blobUrl, {
-      method: "PUT",
+    // Upload to Vercel Blob using correct API endpoint
+    const uploadUrl = `https://blob.vercel-storage.com/`
+    const response = await fetch(uploadUrl, {
+      method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(reportData),
+      body: JSON.stringify({
+        pathname: filename,
+        body: JSON.stringify(reportData),
+        access: "public",
+      }),
     })
 
     if (!response.ok) {
       const errorText = await response.text()
+      console.error("[v0] Blob upload failed:", response.status, errorText)
       throw new Error(`Blob API error: ${response.status} ${response.statusText} - ${errorText}`)
     }
 
@@ -68,11 +73,15 @@ export async function POST(request: NextRequest) {
           console.log(`[v0] Cleaning up ${blobsToDelete.length} old reports`)
 
           for (const blob of blobsToDelete) {
-            await fetch(`https://blob.vercel-storage.com/${blob.pathname}`, {
+            await fetch(`https://blob.vercel-storage.com/`, {
               method: "DELETE",
               headers: {
                 Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
               },
+              body: JSON.stringify({
+                urls: [blob.url],
+              }),
             })
           }
         }
