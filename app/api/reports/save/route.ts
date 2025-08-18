@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { put, list, del } from "@vercel/blob"
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,74 +17,26 @@ export async function POST(request: NextRequest) {
     const windowsCompatibleTimestamp = timestamp.replace(/:/g, "-")
     const filename = `${windowsCompatibleTimestamp}_${sanitizedPropertyName}.json`
 
-    const token = process.env.BLOB_READ_WRITE_TOKEN
-
-    if (!token) {
-      return NextResponse.json(
-        {
-          error: "Blob storage not configured",
-          details: "BLOB_READ_WRITE_TOKEN not available",
-        },
-        { status: 500 },
-      )
-    }
-
-    // Upload to Vercel Blob using correct API endpoint
-    const uploadUrl = `https://blob.vercel-storage.com/`
-    const response = await fetch(uploadUrl, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        pathname: filename,
-        body: JSON.stringify(reportData),
-        access: "public",
-      }),
+    const blob = await put(filename, JSON.stringify(reportData), {
+      access: "public",
     })
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error("[v0] Blob upload failed:", response.status, errorText)
-      throw new Error(`Blob API error: ${response.status} ${response.statusText} - ${errorText}`)
-    }
-
-    const result = await response.json()
-    console.log("[v0] Report saved to Blob storage:", result.url)
+    console.log("[v0] Report saved to Blob storage:", blob.url)
 
     // Clean up old reports - keep only 15 most recent
     try {
-      const listResponse = await fetch("https://blob.vercel-storage.com/", {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
+      const { blobs } = await list()
+      const reportBlobs = blobs
+        .filter((blob) => blob.pathname?.endsWith(".json"))
+        .sort((a, b) => b.pathname.localeCompare(a.pathname))
 
-      if (listResponse.ok) {
-        const { blobs } = await listResponse.json()
-        const reportBlobs = blobs
-          .filter((blob: any) => blob.pathname?.endsWith(".json"))
-          .sort((a: any, b: any) => b.pathname.localeCompare(a.pathname))
+      // Delete reports beyond the 15 most recent
+      if (reportBlobs.length > 15) {
+        const blobsToDelete = reportBlobs.slice(15)
+        console.log(`[v0] Cleaning up ${blobsToDelete.length} old reports`)
 
-        // Delete reports beyond the 15 most recent
-        if (reportBlobs.length > 15) {
-          const blobsToDelete = reportBlobs.slice(15)
-          console.log(`[v0] Cleaning up ${blobsToDelete.length} old reports`)
-
-          for (const blob of blobsToDelete) {
-            await fetch(`https://blob.vercel-storage.com/`, {
-              method: "DELETE",
-              headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                urls: [blob.url],
-              }),
-            })
-          }
+        for (const blobToDelete of blobsToDelete) {
+          await del(blobToDelete.url)
         }
       }
     } catch (cleanupError) {
@@ -95,7 +48,7 @@ export async function POST(request: NextRequest) {
       filename,
       propertyName: sanitizedPropertyName,
       timestamp,
-      url: result.url,
+      url: blob.url,
       message: "Report saved to Blob storage",
     })
   } catch (error) {
