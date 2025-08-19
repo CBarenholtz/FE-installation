@@ -1,13 +1,20 @@
 "use server"
 
-import { createServerActionClient } from "@supabase/auth-helpers-nextjs"
-import { cookies } from "next/headers"
+import { createClient } from "@supabase/supabase-js"
 import { revalidatePath } from "next/cache"
 
 export async function saveReportToSupabase(reportData: any) {
   console.log("[v0] Server Action: STARTING save function")
 
   try {
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error("[v0] Server Action: Missing Supabase environment variables")
+      return {
+        success: false,
+        message: "Server configuration error - missing environment variables",
+      }
+    }
+
     console.log("[v0] Server Action: Saving report to Supabase")
     console.log("[v0] Server Action: Report data received:", {
       hasCustomerInfo: !!reportData.customerInfo,
@@ -16,8 +23,7 @@ export async function saveReportToSupabase(reportData: any) {
       propertyName: reportData.customerInfo?.propertyName,
     })
 
-    const cookieStore = cookies()
-    const supabase = createServerActionClient({ cookies: () => cookieStore })
+    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
 
     const reportId = globalThis.crypto.randomUUID()
     const timestamp = new Date().toISOString()
@@ -64,8 +70,7 @@ export async function loadReportsFromSupabase() {
   try {
     console.log("[v0] Server Action: Loading reports from Supabase")
 
-    const cookieStore = cookies()
-    const supabase = createServerActionClient({ cookies: () => cookieStore })
+    const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!)
 
     const { data: reports, error } = await supabase
       .from("reports")
