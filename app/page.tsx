@@ -182,6 +182,7 @@ function UploadForm() {
       }
 
       localStorage.setItem("rawInstallationData", JSON.stringify(installationData))
+      localStorage.setItem("installationData", JSON.stringify(installationData))
       localStorage.setItem(
         "customerInfo",
         JSON.stringify({
@@ -190,16 +191,22 @@ function UploadForm() {
         }),
       )
 
+      const toiletCount = installationData.reduce((total, item) => {
+        const toiletQty = Number.parseInt(item["Toilet"] || "0", 10)
+        return total + (isNaN(toiletQty) ? 0 : toiletQty)
+      }, 0)
+      localStorage.setItem("toiletCount", JSON.stringify(toiletCount))
+
       if (coverImage) {
         const reader = new FileReader()
         reader.onload = (e) => {
           const imageData = e.target?.result as string
           localStorage.setItem("coverImage", imageData)
-          router.push("/csv-preview")
+          window.location.reload()
         }
         reader.readAsDataURL(coverImage)
       } else {
-        router.push("/csv-preview")
+        window.location.reload()
       }
     } catch (error) {
       console.error("Error processing file:", error)
@@ -587,7 +594,7 @@ function ReportView({
 
 function ReportContent() {
   const router = useRouter()
-  const { customerInfo, toiletCount, setToiletCount, notes, setNotes } = useReportContext()
+  const { customerInfo, toiletCount, setToiletCount, notes, setNotes, setCustomerInfo } = useReportContext()
 
   const [installationData, setInstallationData] = useState<InstallationData[]>([])
   const [loading, setLoading] = useState(true)
@@ -650,6 +657,16 @@ function ReportContent() {
         hasToiletCount: !!storedToiletCount,
         hasCustomerInfo: !!storedCustomerInfo,
       })
+
+      if (storedCustomerInfo) {
+        try {
+          const parsedCustomerInfo = JSON.parse(storedCustomerInfo)
+          setCustomerInfo(parsedCustomerInfo)
+          console.log("[v0] Loaded customerInfo into context:", parsedCustomerInfo.customerName)
+        } catch (error) {
+          console.error("[v0] Error parsing customerInfo:", error)
+        }
+      }
 
       if (storedInstallationData && storedCustomerInfo) {
         const parsedInstallationData = JSON.parse(storedInstallationData)
@@ -724,7 +741,7 @@ function ReportContent() {
     } finally {
       setLoading(false)
     }
-  }, [setToiletCount])
+  }, [setToiletCount, setCustomerInfo])
 
   useEffect(() => {
     loadData()
