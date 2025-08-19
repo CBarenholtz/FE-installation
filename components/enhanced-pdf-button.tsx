@@ -1174,7 +1174,7 @@ export default function EnhancedPdfButton({
       const minColumnWidths = {
         kitchen: 25,
         bathroom: 25,
-        shower: 25,
+        shower: 35, // Increased shower column width from 25 to 35 to accommodate longer text like "1.75 GPM (1); 1.5 GPM (1)"
         toilet: 20,
         notes: 60, // Increased width for notes column
       }
@@ -1501,7 +1501,10 @@ export default function EnhancedPdfButton({
             if (showerText === "—") {
               doc.text("\t—\t", columnPositions[colIndex], yPos)
             } else {
-              doc.text(showerText, columnPositions[colIndex], yPos)
+              const showerLines = doc.splitTextToSize(showerText, columnWidths[colIndex] - 2)
+              showerLines.forEach((line: string, lineIndex: number) => {
+                doc.text(line, columnPositions[colIndex], yPos + lineIndex * 3)
+              })
             }
             colIndex++
           }
