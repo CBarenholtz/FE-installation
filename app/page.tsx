@@ -200,6 +200,23 @@ function UploadForm() {
         return total + (isNaN(toiletQty) ? 0 : toiletQty)
       }, 0)
 
+      localStorage.setItem("rawInstallationData", JSON.stringify(installationData))
+      localStorage.setItem("installationData", JSON.stringify(installationData))
+      localStorage.setItem("customerInfo", JSON.stringify(customerInfoWithDate))
+      localStorage.setItem("toiletCount", JSON.stringify(toiletCount))
+
+      console.log("[v0] Data saved to localStorage:", {
+        installationDataLength: installationData.length,
+        customerName: customerInfoWithDate.customerName,
+        toiletCount: toiletCount,
+      })
+
+      setProcessedData({
+        installationData,
+        toiletCount,
+        customerInfo: customerInfoWithDate,
+      })
+
       console.log("[v0] Saving processed data directly to cloud storage...")
 
       const reportData = {
@@ -230,23 +247,6 @@ function UploadForm() {
         alert("⚠️ Report generated but cloud save failed. Data saved locally as backup.")
       }
 
-      setProcessedData({
-        installationData,
-        toiletCount,
-        customerInfo: customerInfoWithDate,
-      })
-
-      localStorage.setItem("rawInstallationData", JSON.stringify(installationData))
-      localStorage.setItem("installationData", JSON.stringify(installationData))
-      localStorage.setItem("customerInfo", JSON.stringify(customerInfoWithDate))
-      localStorage.setItem("toiletCount", JSON.stringify(toiletCount))
-
-      console.log("[v0] Data saved to localStorage:", {
-        installationDataLength: installationData.length,
-        customerName: customerInfoWithDate.customerName,
-        toiletCount: toiletCount,
-      })
-
       if (coverImage) {
         const reader = new FileReader()
         reader.onload = (e) => {
@@ -255,14 +255,14 @@ function UploadForm() {
           console.log("[v0] Cover image saved, reloading page...")
           setTimeout(() => {
             window.location.reload()
-          }, 100)
+          }, 500)
         }
         reader.readAsDataURL(coverImage)
       } else {
         console.log("[v0] No cover image, reloading page...")
         setTimeout(() => {
           window.location.reload()
-        }, 100)
+        }, 500)
       }
     } catch (error) {
       console.error("Error processing file:", error)
@@ -821,6 +821,7 @@ function ReportContent() {
       })
 
       if (!hasValidData) {
+        console.log("[v0] No valid data found, staying in UploadForm")
         setInstallationData([])
         setFilteredData([])
         setReportNotes([])
