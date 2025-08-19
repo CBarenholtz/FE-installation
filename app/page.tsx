@@ -200,25 +200,23 @@ function UploadForm() {
         return total + (isNaN(toiletQty) ? 0 : toiletQty)
       }, 0)
 
-      const dataToSave = {
-        installationData,
-        customerInfo: customerInfoWithDate,
-        toiletCount,
-      }
-
-      // Save with multiple keys to ensure data persistence
       localStorage.setItem("rawInstallationData", JSON.stringify(installationData))
       localStorage.setItem("installationData", JSON.stringify(installationData))
       localStorage.setItem("customerInfo", JSON.stringify(customerInfoWithDate))
       localStorage.setItem("toiletCount", JSON.stringify(toiletCount))
-
-      // Force localStorage to flush
       localStorage.setItem("dataReady", "true")
 
-      console.log("[v0] Data saved to localStorage:", {
-        installationDataLength: installationData.length,
-        customerName: customerInfoWithDate.customerName,
-        toiletCount: toiletCount,
+      const verifyData = {
+        installationData: localStorage.getItem("installationData"),
+        customerInfo: localStorage.getItem("customerInfo"),
+        toiletCount: localStorage.getItem("toiletCount"),
+      }
+
+      console.log("[v0] Data verification after save:", {
+        installationDataSaved: !!verifyData.installationData,
+        customerInfoSaved: !!verifyData.customerInfo,
+        toiletCountSaved: !!verifyData.toiletCount,
+        installationDataLength: verifyData.installationData ? JSON.parse(verifyData.installationData).length : 0,
       })
 
       setProcessedData({
@@ -270,17 +268,17 @@ function UploadForm() {
         reader.onload = (e) => {
           const imageData = e.target?.result as string
           localStorage.setItem("coverImage", imageData)
-          console.log("[v0] Cover image saved, reloading page in 1 second...")
+          console.log("[v0] Cover image saved, reloading page in 2 seconds...")
           setTimeout(() => {
             window.location.reload()
-          }, 1000)
+          }, 2000)
         }
         reader.readAsDataURL(coverImage)
       } else {
-        console.log("[v0] No cover image, reloading page in 1 second...")
+        console.log("[v0] No cover image, reloading page in 2 seconds...")
         setTimeout(() => {
           window.location.reload()
-        }, 1000)
+        }, 2000)
       }
     } catch (error) {
       console.error("Error processing file:", error)
@@ -502,54 +500,44 @@ function ReportView({
   }
 
   const handleSaveReport = async () => {
-    try {
-      console.log("[v0] SAVE BUTTON CLICKED - Starting save process")
-      setIsSaving(true)
-      console.log("[v0] Set isSaving to true")
+    console.log("[v0] SAVE FUNCTION CALLED - IMMEDIATE LOG")
 
-      console.log("[v0] Preparing report data...")
+    if (isSaving) {
+      console.log("[v0] Already saving, returning early")
+      return
+    }
+
+    setIsSaving(true)
+
+    try {
+      console.log("[v0] About to save report data")
+
       const reportData = {
         customerInfo,
         installationData,
         toiletCount,
         reportNotes: notes,
-        reportTitle: localStorage.getItem("reportTitle") || "",
-        letterText: localStorage.getItem("letterText") || "",
-        signatureName: localStorage.getItem("signatureName") || "",
-        signatureTitle: localStorage.getItem("signatureTitle") || "",
+        reportTitle: `${customerInfo.propertyName} - ${customerInfo.customerName}`,
+        letterText: "",
+        signatureName: "",
+        signatureTitle: "",
       }
 
-      console.log("[v0] Report data prepared:", {
-        hasCustomerInfo: !!reportData.customerInfo,
-        customerName: reportData.customerInfo?.customerName,
-        hasInstallationData: !!reportData.installationData,
-        installationDataLength: reportData.installationData?.length || 0,
-        notesLength: reportData.reportNotes?.length || 0,
-        reportTitle: reportData.reportTitle,
-      })
-
-      console.log("[v0] About to call saveReportToSupabase Server Action...")
+      console.log("[v0] Calling Server Action with data:", reportData.customerInfo?.customerName)
 
       const result = await saveReportToSupabase(reportData)
 
-      console.log("[v0] Server Action returned result:", result)
+      console.log("[v0] Server Action result:", result)
 
-      if (result.success) {
-        console.log("[v0] Report saved via Server Action successfully")
-        alert(
-          `Report saved to cloud storage!\nProperty: ${customerInfo.propertyName}\nSaved at: ${new Date().toLocaleString()}\n\nYour report is now accessible from any device.`,
-        )
-        setTimeout(() => {
-          onBack()
-        }, 100)
+      if (result?.success) {
+        alert("✅ Report saved successfully to cloud storage!")
       } else {
-        throw new Error(result.message || "Failed to save to cloud storage")
+        alert("❌ Failed to save report: " + (result?.message || "Unknown error"))
       }
     } catch (error) {
-      console.error("[v0] Error in handleSaveReport:", error)
-      alert("Error saving report to cloud storage. Please try again.")
+      console.error("[v0] Save error:", error)
+      alert("❌ Error saving report: " + error)
     } finally {
-      console.log("[v0] Setting isSaving to false")
       setIsSaving(false)
     }
   }
@@ -581,29 +569,9 @@ function ReportView({
           </Button>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            onClick={(e) => {
-              console.log("[v0] BUTTON CLICK EVENT TRIGGERED")
-              console.log("[v0] Button disabled state:", isSaving)
-              console.log("[v0] Event object:", e)
-              console.log("[v0] About to call handleSaveReport function")
-              console.log("[v0] Current timestamp:", new Date().toISOString())
-              try {
-                handleSaveReport()
-                console.log("[v0] handleSaveReport called successfully")
-              } catch (error) {
-                console.error("[v0] Error calling handleSaveReport:", error)
-              }
-            }}
-            disabled={isSaving}
-            onMouseDown={() => console.log("[v0] Save button mouse down")}
-            onMouseUp={() => console.log("[v0] Save button mouse up")}
-            onFocus={() => console.log("[v0] Save button focused")}
-            onBlur={() => console.log("[v0] Save button blurred")}
-          >
+          <Button variant="outline" onClick={handleSaveReport} disabled={isSaving}>
             <Save className="mr-2 h-4 w-4" />
-            {isSaving ? "Saving to Cloud..." : "Save to Cloud"}
+            {isSaving ? "Saving..." : "Save to Cloud"}
           </Button>
           <ExcelExportButton
             customerInfo={customerInfo}
@@ -694,6 +662,7 @@ function ReportContent() {
   const [csvSchema, setCsvSchema] = useState<any[]>([])
   const [filteredData, setFilteredData] = useState<InstallationData[]>([])
   const [reportNotes, setReportNotes] = useState<Note[]>([])
+  const [hasValidData, setHasValidData] = useState(false)
 
   const handleBack = () => {
     try {
@@ -754,14 +723,14 @@ function ReportContent() {
         customerInfoLength: storedCustomerInfo ? storedCustomerInfo.length : 0,
       })
 
-      let hasValidData = false
+      let dataLoaded = false
 
       if (storedCustomerInfo) {
         try {
           const parsedCustomerInfo = JSON.parse(storedCustomerInfo)
           setCustomerInfo(parsedCustomerInfo)
           console.log("[v0] Loaded customerInfo into context:", parsedCustomerInfo.customerName)
-          hasValidData = true
+          dataLoaded = true
         } catch (error) {
           console.error("[v0] Error parsing customerInfo:", error)
         }
@@ -781,7 +750,7 @@ function ReportContent() {
           if (parsedInstallationData.length > 0) {
             setInstallationData(parsedInstallationData)
             setToiletCount(parsedToiletCount)
-            hasValidData = true
+            dataLoaded = true
 
             const firstItem = parsedInstallationData[0]
             const schema = Object.keys(firstItem).map((key) => ({
@@ -832,13 +801,15 @@ function ReportContent() {
         }
       }
 
+      setHasValidData(dataLoaded)
+
       console.log("[v0] Final data loading result:", {
-        hasValidData,
-        hasCustomerInfo: !!customerInfo,
-        installationDataLength: installationData.length,
+        hasValidData: dataLoaded,
+        hasCustomerInfo: !!storedCustomerInfo,
+        installationDataLength: storedInstallationData ? JSON.parse(storedInstallationData).length : 0,
       })
 
-      if (!hasValidData) {
+      if (!dataLoaded) {
         console.log("[v0] No valid data found, staying in UploadForm")
         setInstallationData([])
         setFilteredData([])
@@ -851,6 +822,7 @@ function ReportContent() {
       setFilteredData([])
       setReportNotes([])
       setToiletCount(0)
+      setHasValidData(false)
     } finally {
       setLoading(false)
     }
@@ -870,7 +842,7 @@ function ReportContent() {
     return <LoadingState />
   }
 
-  if (!customerInfo || installationData.length === 0) {
+  if (!hasValidData) {
     return <NoDataState onBack={handleBack} />
   }
 
