@@ -7,15 +7,23 @@ export async function saveReportDirectly(reportData: any) {
 
   try {
     const supabaseUrl = process.env.SUPABASE_URL
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
 
     console.log("[v0] NEW SAVE METHOD: Environment check:", {
       hasUrl: !!supabaseUrl,
       hasKey: !!supabaseServiceKey,
       urlValue: supabaseUrl ? supabaseUrl.substring(0, 20) + "..." : "missing",
+      keyType: process.env.SUPABASE_SERVICE_ROLE_KEY ? "service_role" : "anon",
     })
 
     if (!supabaseUrl || !supabaseServiceKey) {
+      console.log("[v0] NEW SAVE METHOD: Available env vars:", {
+        SUPABASE_URL: !!process.env.SUPABASE_URL,
+        SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+        SUPABASE_ANON_KEY: !!process.env.SUPABASE_ANON_KEY,
+        NEXT_PUBLIC_SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      })
       return {
         success: false,
         message: "Missing Supabase configuration",
