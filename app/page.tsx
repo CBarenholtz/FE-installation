@@ -400,12 +400,18 @@ function ReportView({
         installationData,
         toiletCount,
         reportNotes: notes,
-        // Exclude large image data that causes Server Action failures
-        reportTitle: localStorage.getItem("reportTitle"),
-        letterText: localStorage.getItem("letterText"),
-        signatureName: localStorage.getItem("signatureName"),
-        signatureTitle: localStorage.getItem("signatureTitle"),
+        reportTitle: localStorage.getItem("reportTitle") || "",
+        letterText: localStorage.getItem("letterText") || "",
+        signatureName: localStorage.getItem("signatureName") || "",
+        signatureTitle: localStorage.getItem("signatureTitle") || "",
       }
+
+      console.log("[v0] Prepared report data for Server Action:", {
+        hasCustomerInfo: !!reportData.customerInfo,
+        hasInstallationData: !!reportData.installationData,
+        installationDataLength: reportData.installationData?.length || 0,
+        notesLength: reportData.reportNotes?.length || 0,
+      })
 
       const result = await saveReportToSupabase(reportData)
 
