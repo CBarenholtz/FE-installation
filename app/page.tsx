@@ -392,9 +392,11 @@ function ReportView({
 
   const handleSaveReport = async () => {
     try {
+      console.log("[v0] SAVE BUTTON CLICKED - Starting save process")
       setIsSaving(true)
-      console.log("[v0] Saving report using Server Action")
+      console.log("[v0] Set isSaving to true")
 
+      console.log("[v0] Preparing report data...")
       const reportData = {
         customerInfo,
         installationData,
@@ -406,14 +408,20 @@ function ReportView({
         signatureTitle: localStorage.getItem("signatureTitle") || "",
       }
 
-      console.log("[v0] Prepared report data for Server Action:", {
+      console.log("[v0] Report data prepared:", {
         hasCustomerInfo: !!reportData.customerInfo,
+        customerName: reportData.customerInfo?.customerName,
         hasInstallationData: !!reportData.installationData,
         installationDataLength: reportData.installationData?.length || 0,
         notesLength: reportData.reportNotes?.length || 0,
+        reportTitle: reportData.reportTitle,
       })
 
+      console.log("[v0] About to call saveReportToSupabase Server Action...")
+
       const result = await saveReportToSupabase(reportData)
+
+      console.log("[v0] Server Action returned result:", result)
 
       if (result.success) {
         console.log("[v0] Report saved via Server Action successfully")
@@ -427,9 +435,10 @@ function ReportView({
         throw new Error(result.message || "Failed to save to cloud storage")
       }
     } catch (error) {
-      console.error("[v0] Error saving report via Server Action:", error)
+      console.error("[v0] Error in handleSaveReport:", error)
       alert("Error saving report to cloud storage. Please try again.")
     } finally {
+      console.log("[v0] Setting isSaving to false")
       setIsSaving(false)
     }
   }
