@@ -1,18 +1,21 @@
 import { type NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest) {
-  console.log("[v0] Save route called - minimal test version")
+  console.log("[v0] Save route called - using Supabase cloud storage")
 
   try {
-    const testData = {
+    const body = await request.json()
+    console.log("[v0] Received save request for:", body.title || "untitled report")
+
+    const reportData = {
       id: crypto.randomUUID(),
-      title: "test-report",
-      data: { test: "minimal data" },
+      title: body.title || `Report ${new Date().toLocaleDateString()}`,
+      data: body,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
 
-    console.log("[v0] Attempting to save test data:", testData.id)
+    console.log("[v0] Attempting to save report:", reportData.id)
 
     const response = await fetch(`${process.env.SUPABASE_URL}/rest/v1/reports`, {
       method: "POST",
@@ -20,37 +23,23 @@ export async function POST(request: NextRequest) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
         apikey: process.env.SUPABASE_ANON_KEY!,
+        Prefer: "return=minimal",
       },
-      body: JSON.stringify(testData),
+      body: JSON.stringify(reportData),
     })
 
     console.log("[v0] Supabase response status:", response.status)
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error("[v0] Supabase error details:", errorText)
-      return NextResponse.json(
-        {
-          error: "Database insertion failed",
-          status: response.status,
-          details: errorText,
-        },
-        { status: 500 },
-      )
+      console.error("[v0] Supabase error:", errorText)
+      return NextResponse.json({ error: "Failed to save report", details: errorText }, { status: 500 })
     }
 
-    console.log("[v0] Test save successful!")
-
-    return NextResponse.json({
-      success: true,
-      message: "Test save completed successfully",
-      id: testData.id,
-    })
+    console.log("[v0] Report saved successfully to Supabase cloud storage")
+    return NextResponse.json({ success: true, message: "Report saved successfully", id: reportData.id })
   } catch (error) {
     console.error("[v0] Save route error:", error)
-    return NextResponse.json(
-      { error: "Route execution failed", details: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 },
-    )
+    return NextResponse.json({ error: "Save operation failed" }, { status: 500 })
   }
 }
