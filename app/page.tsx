@@ -400,8 +400,7 @@ function ReportView({
         installationData,
         toiletCount,
         reportNotes: notes,
-        reportImages: images,
-        coverImage: localStorage.getItem("coverImage"),
+        // Exclude large image data that causes Server Action failures
         reportTitle: localStorage.getItem("reportTitle"),
         letterText: localStorage.getItem("letterText"),
         signatureName: localStorage.getItem("signatureName"),
