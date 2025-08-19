@@ -1,15 +1,11 @@
 "use server"
 
+import { createServerActionClient } from "@supabase/auth-helpers-nextjs"
+import { cookies } from "next/headers"
 import { revalidatePath } from "next/cache"
 
 export async function saveReportToSupabase(reportData: any) {
   console.log("[v0] Server Action: STARTING save function")
-  console.log("[v0] Server Action: Environment variables check:", {
-    hasSupabaseUrl: !!process.env.SUPABASE_URL,
-    hasServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-    hasAnonKey: !!process.env.SUPABASE_ANON_KEY,
-    supabaseUrl: process.env.SUPABASE_URL?.substring(0, 30) + "...",
-  })
 
   try {
     console.log("[v0] Server Action: Saving report to Supabase")
@@ -20,13 +16,8 @@ export async function saveReportToSupabase(reportData: any) {
       propertyName: reportData.customerInfo?.propertyName,
     })
 
-    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.SUPABASE_ANON_KEY) {
-      console.error("[v0] Server Action: Missing required environment variables")
-      return {
-        success: false,
-        message: "Server configuration error - missing environment variables",
-      }
-    }
+    const cookieStore = cookies()
+    const supabase = createServerActionClient({ cookies: () => cookieStore })
 
     const reportId = globalThis.crypto.randomUUID()
     const timestamp = new Date().toISOString()
@@ -35,28 +26,16 @@ export async function saveReportToSupabase(reportData: any) {
 
     console.log("[v0] Server Action: Prepared save data:", { reportId, title, timestamp })
 
-    const response = await fetch(`${process.env.SUPABASE_URL}/rest/v1/reports`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
-        apikey: process.env.SUPABASE_ANON_KEY!,
-        "Content-Type": "application/json",
-        Prefer: "return=minimal",
-      },
-      body: JSON.stringify({
-        id: reportId,
-        title: title,
-        data: reportData,
-        created_at: timestamp,
-        updated_at: timestamp,
-      }),
+    const { data, error } = await supabase.from("reports").insert({
+      id: reportId,
+      title: title,
+      data: reportData,
+      created_at: timestamp,
+      updated_at: timestamp,
     })
 
-    console.log("[v0] Server Action: Supabase response status:", response.status)
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error("[v0] Server Action: Supabase save error:", errorText)
+    if (error) {
+      console.error("[v0] Server Action: Supabase save error:", error)
       return {
         success: false,
         message: "Failed to save report to cloud storage",
@@ -85,18 +64,17 @@ export async function loadReportsFromSupabase() {
   try {
     console.log("[v0] Server Action: Loading reports from Supabase")
 
-    const response = await fetch(
-      `${process.env.SUPABASE_URL}/rest/v1/reports?select=id,title,created_at&order=created_at.desc&limit=15`,
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
-          apikey: process.env.SUPABASE_ANON_KEY!,
-        },
-      },
-    )
+    const cookieStore = cookies()
+    const supabase = createServerActionClient({ cookies: () => cookieStore })
 
-    if (!response.ok) {
-      console.error("[v0] Server Action: Supabase query error:", await response.text())
+    const { data: reports, error } = await supabase
+      .from("reports")
+      .select("id,title,created_at")
+      .order("created_at", { ascending: false })
+      .limit(15)
+
+    if (error) {
+      console.error("[v0] Server Action: Supabase query error:", error)
       return {
         success: true,
         reports: [],
@@ -104,9 +82,7 @@ export async function loadReportsFromSupabase() {
       }
     }
 
-    const reports = await response.json()
-
-    const formattedReports = reports.map((report: any) => {
+    const formattedReports = (reports || []).map((report: any) => {
       const parts = report.title.split("_")
       const propertyName = parts[0].replace(/-/g, " ")
       const timestamp = report.created_at
