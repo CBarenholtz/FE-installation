@@ -21,7 +21,7 @@ import ReportPicturesPage from "@/components/report-pictures-page"
 import { ReportProvider, useReportContext } from "@/lib/report-context"
 import { parseExcelFile } from "@/lib/excel-parser"
 import type { CustomerInfo, InstallationData, Note, ImageData } from "@/lib/types"
-import { saveReportToSupabase, loadReportsFromSupabase } from "@/lib/actions"
+import { saveReportToSupabase, loadReportsFromSupabase, saveReportDirectly } from "@/lib/actions"
 
 interface SavedReport {
   id: string
@@ -75,32 +75,6 @@ function UploadForm() {
   useEffect(() => {
     console.log("[v0] UPLOAD FORM COMPONENT RENDERED - Save button is NOT available here")
   }, [])
-
-  const WorkflowInstructions = () => (
-    <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-      <h3 className="text-lg font-semibold text-amber-800 mb-2">📋 How to Generate and Save Reports</h3>
-      <ol className="list-decimal list-inside space-y-1 text-amber-700">
-        <li>
-          <strong>Fill out customer information</strong> (name, property, address)
-        </li>
-        <li>
-          <strong>Upload Excel/CSV file</strong> with installation data
-        </li>
-        <li>
-          <strong>Click "Generate Report"</strong> to process the data
-        </li>
-        <li>
-          <strong>Review your report</strong> in the preview tabs
-        </li>
-        <li>
-          <strong>Click "Save to Cloud"</strong> to save your report permanently
-        </li>
-      </ol>
-      <p className="text-sm text-amber-600 mt-2">
-        💡 The save functionality is only available after generating a report from uploaded data.
-      </p>
-    </div>
-  )
 
   const loadSavedReports = async () => {
     try {
@@ -245,6 +219,10 @@ function UploadForm() {
         installationDataLength: verifyData.installationData ? JSON.parse(verifyData.installationData).length : 0,
       })
 
+      if (!verifyData.installationData || !verifyData.customerInfo) {
+        throw new Error("Failed to save data to localStorage")
+      }
+
       setProcessedData({
         installationData,
         toiletCount,
@@ -294,22 +272,55 @@ function UploadForm() {
         reader.onload = (e) => {
           const imageData = e.target?.result as string
           localStorage.setItem("coverImage", imageData)
-          console.log("[v0] Cover image saved, reloading page in 2 seconds...")
+          console.log("[v0] Cover image saved, reloading page in 3 seconds...")
           setTimeout(() => {
             window.location.reload()
-          }, 2000)
+          }, 3000)
         }
         reader.readAsDataURL(coverImage)
       } else {
-        console.log("[v0] No cover image, reloading page in 2 seconds...")
+        console.log("[v0] No cover image, reloading page in 3 seconds...")
         setTimeout(() => {
           window.location.reload()
-        }, 2000)
+        }, 3000)
       }
     } catch (error) {
       console.error("Error processing file:", error)
       alert("Error processing file. Please check the file format and try again.")
       setIsProcessing(false)
+    }
+  }
+
+  const handleSaveProcessedData = async () => {
+    if (!processedData || isSaving) return
+
+    setIsSaving(true)
+    try {
+      console.log("[v0] Using NEW save method from UploadForm")
+
+      const reportData = {
+        customerInfo: processedData.customerInfo,
+        installationData: processedData.installationData,
+        toiletCount: processedData.toiletCount,
+        reportNotes: [],
+        reportTitle: `${processedData.customerInfo.propertyName} - ${processedData.customerInfo.customerName}`,
+        letterText: "",
+        signatureName: "",
+        signatureTitle: "",
+      }
+
+      const result = await saveReportDirectly(reportData)
+
+      if (result?.success) {
+        alert("✅ Report saved successfully to cloud storage!")
+      } else {
+        alert("❌ Failed to save report: " + (result?.message || "Unknown error"))
+      }
+    } catch (error) {
+      console.error("[v0] Save error:", error)
+      alert("❌ Error saving report: " + error)
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -321,8 +332,6 @@ function UploadForm() {
             <h1 className="text-2xl font-bold">Water Installation Report Generator</h1>
           </div>
 
-          <WorkflowInstructions />
-
           {processedData && (
             <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
               <div className="flex items-center justify-between">
@@ -333,6 +342,14 @@ function UploadForm() {
                     {processedData.customerInfo.propertyName}
                   </p>
                 </div>
+                <Button
+                  onClick={handleSaveProcessedData}
+                  disabled={isSaving}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <Save className="mr-2 h-4 w-4" />
+                  {isSaving ? "Saving..." : "Save to Cloud"}
+                </Button>
               </div>
             </div>
           )}
@@ -839,7 +856,7 @@ function ReportContent() {
         }
       }
 
-      const dataLoaded = hasCustomerData && hasInstallationDataLoaded
+      const dataLoaded = hasCustomerData || hasInstallationDataLoaded
       setHasValidData(dataLoaded)
 
       console.log("[v0] Final data loading result:", {
