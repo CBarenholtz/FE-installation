@@ -76,6 +76,32 @@ function UploadForm() {
     console.log("[v0] UPLOAD FORM COMPONENT RENDERED - Save button is NOT available here")
   }, [])
 
+  const WorkflowInstructions = () => (
+    <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+      <h3 className="text-lg font-semibold text-amber-800 mb-2">📋 How to Generate and Save Reports</h3>
+      <ol className="list-decimal list-inside space-y-1 text-amber-700">
+        <li>
+          <strong>Fill out customer information</strong> (name, property, address)
+        </li>
+        <li>
+          <strong>Upload Excel/CSV file</strong> with installation data
+        </li>
+        <li>
+          <strong>Click "Generate Report"</strong> to process the data
+        </li>
+        <li>
+          <strong>Review your report</strong> in the preview tabs
+        </li>
+        <li>
+          <strong>Click "Save to Cloud"</strong> to save your report permanently
+        </li>
+      </ol>
+      <p className="text-sm text-amber-600 mt-2">
+        💡 The save functionality is only available after generating a report from uploaded data.
+      </p>
+    </div>
+  )
+
   const loadSavedReports = async () => {
     try {
       setIsLoadingReports(true)
@@ -295,6 +321,8 @@ function UploadForm() {
             <h1 className="text-2xl font-bold">Water Installation Report Generator</h1>
           </div>
 
+          <WorkflowInstructions />
+
           {processedData && (
             <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
               <div className="flex items-center justify-between">
@@ -501,6 +529,11 @@ function ReportView({
 
   const handleSaveReport = async () => {
     console.log("[v0] SAVE FUNCTION CALLED - IMMEDIATE LOG")
+    console.log("[v0] Environment check:", {
+      hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+      hasSupabaseAnonKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      hasSupabaseServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+    })
 
     if (isSaving) {
       console.log("[v0] Already saving, returning early")
@@ -523,7 +556,11 @@ function ReportView({
         signatureTitle: "",
       }
 
-      console.log("[v0] Calling Server Action with data:", reportData.customerInfo?.customerName)
+      console.log("[v0] Calling Server Action with data:", {
+        customerName: reportData.customerInfo?.customerName,
+        installationDataLength: reportData.installationData?.length,
+        toiletCount: reportData.toiletCount,
+      })
 
       const result = await saveReportToSupabase(reportData)
 
@@ -723,14 +760,15 @@ function ReportContent() {
         customerInfoLength: storedCustomerInfo ? storedCustomerInfo.length : 0,
       })
 
-      let dataLoaded = false
+      let hasCustomerData = false
+      let hasInstallationDataLoaded = false
 
       if (storedCustomerInfo) {
         try {
           const parsedCustomerInfo = JSON.parse(storedCustomerInfo)
           setCustomerInfo(parsedCustomerInfo)
           console.log("[v0] Loaded customerInfo into context:", parsedCustomerInfo.customerName)
-          dataLoaded = true
+          hasCustomerData = true
         } catch (error) {
           console.error("[v0] Error parsing customerInfo:", error)
         }
@@ -750,7 +788,7 @@ function ReportContent() {
           if (parsedInstallationData.length > 0) {
             setInstallationData(parsedInstallationData)
             setToiletCount(parsedToiletCount)
-            dataLoaded = true
+            hasInstallationDataLoaded = true
 
             const firstItem = parsedInstallationData[0]
             const schema = Object.keys(firstItem).map((key) => ({
@@ -801,11 +839,13 @@ function ReportContent() {
         }
       }
 
+      const dataLoaded = hasCustomerData && hasInstallationDataLoaded
       setHasValidData(dataLoaded)
 
       console.log("[v0] Final data loading result:", {
         hasValidData: dataLoaded,
-        hasCustomerInfo: !!storedCustomerInfo,
+        hasCustomerInfo: hasCustomerData,
+        hasInstallationData: hasInstallationDataLoaded,
         installationDataLength: storedInstallationData ? JSON.parse(storedInstallationData).length : 0,
       })
 
@@ -815,6 +855,8 @@ function ReportContent() {
         setFilteredData([])
         setReportNotes([])
         setToiletCount(0)
+      } else {
+        console.log("[v0] Valid data found, switching to ReportView")
       }
     } catch (error) {
       console.error("[v0] Error loading data:", error)
