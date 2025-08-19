@@ -3,26 +3,32 @@
 import { revalidatePath } from "next/cache"
 
 export async function saveReportDirectly(reportData: any) {
-  console.log("[v0] NEW SAVE METHOD: Starting direct save to Supabase")
+  console.log("[v0] FIXED SAVE METHOD: Starting direct save to Supabase")
 
   try {
-    const supabaseUrl = process.env.SUPABASE_URL
-    const supabaseKey = process.env.SUPABASE_ANON_KEY
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseKey =
+      process.env.SUPABASE_SERVICE_ROLE_KEY ||
+      process.env.SUPABASE_ANON_KEY ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-    console.log("[v0] NEW SAVE METHOD: Environment check:", {
+    console.log("[v0] FIXED SAVE METHOD: Environment check:", {
       hasUrl: !!supabaseUrl,
       hasKey: !!supabaseKey,
       urlValue: supabaseUrl ? supabaseUrl.substring(0, 20) + "..." : "missing",
+      allEnvVars: {
+        SUPABASE_URL: !!process.env.SUPABASE_URL,
+        NEXT_PUBLIC_SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+        SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+        SUPABASE_ANON_KEY: !!process.env.SUPABASE_ANON_KEY,
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      },
     })
 
     if (!supabaseUrl || !supabaseKey) {
-      console.log("[v0] NEW SAVE METHOD: Available env vars:", {
-        SUPABASE_URL: !!process.env.SUPABASE_URL,
-        SUPABASE_ANON_KEY: !!process.env.SUPABASE_ANON_KEY,
-      })
       return {
         success: false,
-        message: "Missing Supabase configuration",
+        message: `Missing Supabase configuration - URL: ${!!supabaseUrl}, Key: ${!!supabaseKey}`,
       }
     }
 
@@ -44,7 +50,7 @@ export async function saveReportDirectly(reportData: any) {
       updated_at: timestamp,
     }
 
-    console.log("[v0] NEW SAVE METHOD: Attempting to save with payload:", {
+    console.log("[v0] FIXED SAVE METHOD: Attempting to save with payload:", {
       id: savePayload.id,
       title: savePayload.title,
       dataSize: JSON.stringify(savePayload.data).length,
@@ -62,8 +68,8 @@ export async function saveReportDirectly(reportData: any) {
     })
 
     const responseText = await response.text()
-    console.log("[v0] NEW SAVE METHOD: Response status:", response.status)
-    console.log("[v0] NEW SAVE METHOD: Response text:", responseText)
+    console.log("[v0] FIXED SAVE METHOD: Response status:", response.status)
+    console.log("[v0] FIXED SAVE METHOD: Response text:", responseText)
 
     if (!response.ok) {
       return {
@@ -72,7 +78,7 @@ export async function saveReportDirectly(reportData: any) {
       }
     }
 
-    console.log("[v0] NEW SAVE METHOD: Successfully saved report!")
+    console.log("[v0] FIXED SAVE METHOD: Successfully saved report!")
     revalidatePath("/")
 
     return {
@@ -81,7 +87,7 @@ export async function saveReportDirectly(reportData: any) {
       reportId: reportId,
     }
   } catch (error) {
-    console.error("[v0] NEW SAVE METHOD: Error:", error)
+    console.error("[v0] FIXED SAVE METHOD: Error:", error)
     return {
       success: false,
       message: `Save error: ${error}`,
