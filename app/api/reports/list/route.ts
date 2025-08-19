@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server"
-import { crypto } from "crypto"
 
 export async function GET() {
   try {
@@ -65,8 +64,7 @@ export async function POST(request: Request) {
     const body = await request.json()
     console.log("[v0] Received save request with data")
 
-    // Generate unique ID and title
-    const reportId = crypto.randomUUID()
+    const reportId = globalThis.crypto.randomUUID()
     const timestamp = new Date().toISOString()
     const propertyName = body.customerInfo?.propertyName || "Unknown Property"
     const title = `${propertyName.replace(/\s+/g, "-")}_${Date.now()}`
