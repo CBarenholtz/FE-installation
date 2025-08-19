@@ -93,41 +93,46 @@ function UploadForm() {
 
     try {
       setIsProcessing(true)
-      console.log("[v0] Loading report from Supabase:", selectedReport)
+      console.log("[v0] Loading specific report using Server Action:", selectedReport)
 
-      const response = await fetch(`/api/reports/load?id=${selectedReport}`)
+      const result = await loadReportsFromSupabase()
 
-      if (response.ok) {
-        const data = await response.json()
-        const reportData = data.report_data
+      if (result.success) {
+        const selectedReportData = result.reports.find((report) => report.id === selectedReport)
 
-        if (reportData.customerInfo) {
-          localStorage.setItem("customerInfo", JSON.stringify(reportData.customerInfo))
-        }
-        if (reportData.installationData) {
-          localStorage.setItem("installationData", JSON.stringify(reportData.installationData))
-          localStorage.setItem("rawInstallationData", JSON.stringify(reportData.installationData))
-        }
-        if (reportData.toiletCount) {
-          localStorage.setItem("toiletCount", JSON.stringify(reportData.toiletCount))
-        }
-        if (reportData.reportImages) {
-          localStorage.setItem("reportImages", JSON.stringify(reportData.reportImages))
-        }
-        if (reportData.reportNotes) {
-          localStorage.setItem("reportNotes", JSON.stringify(reportData.reportNotes))
-        }
-        if (reportData.coverImage) {
-          localStorage.setItem("coverImage", reportData.coverImage)
-        }
+        if (selectedReportData && selectedReportData.data) {
+          const reportData = selectedReportData.data
 
-        console.log("[v0] Report loaded from Supabase cloud storage")
-        window.location.reload()
+          if (reportData.customerInfo) {
+            localStorage.setItem("customerInfo", JSON.stringify(reportData.customerInfo))
+          }
+          if (reportData.installationData) {
+            localStorage.setItem("installationData", JSON.stringify(reportData.installationData))
+            localStorage.setItem("rawInstallationData", JSON.stringify(reportData.installationData))
+          }
+          if (reportData.toiletCount) {
+            localStorage.setItem("toiletCount", JSON.stringify(reportData.toiletCount))
+          }
+          if (reportData.reportImages) {
+            localStorage.setItem("reportImages", JSON.stringify(reportData.reportImages))
+          }
+          if (reportData.reportNotes) {
+            localStorage.setItem("reportNotes", JSON.stringify(reportData.reportNotes))
+          }
+          if (reportData.coverImage) {
+            localStorage.setItem("coverImage", reportData.coverImage)
+          }
+
+          console.log("[v0] Report loaded from Supabase using Server Action")
+          window.location.reload()
+        } else {
+          alert("Report not found. Please try again.")
+        }
       } else {
         alert("Error loading report. Please try again.")
       }
     } catch (error) {
-      console.error("[v0] Error loading report:", error)
+      console.error("[v0] Error loading report via Server Action:", error)
       alert("Error loading report. Please try again.")
     } finally {
       setIsProcessing(false)
