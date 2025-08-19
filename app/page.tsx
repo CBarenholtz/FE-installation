@@ -470,7 +470,16 @@ function ReportView({
           </Button>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={handleSaveReport} disabled={isSaving}>
+          <Button
+            variant="outline"
+            onClick={(e) => {
+              console.log("[v0] BUTTON CLICK EVENT TRIGGERED")
+              console.log("[v0] Button disabled state:", isSaving)
+              console.log("[v0] Event object:", e)
+              handleSaveReport()
+            }}
+            disabled={isSaving}
+          >
             <Save className="mr-2 h-4 w-4" />
             {isSaving ? "Saving to Cloud..." : "Save to Cloud"}
           </Button>
