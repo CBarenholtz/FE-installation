@@ -5,11 +5,19 @@ import { revalidatePath } from "next/cache"
 export async function saveReportToSupabase(reportData: any) {
   try {
     console.log("[v0] Server Action: Saving report to Supabase")
+    console.log("[v0] Server Action: Report data received:", {
+      hasCustomerInfo: !!reportData.customerInfo,
+      hasInstallationData: !!reportData.installationData,
+      customerName: reportData.customerInfo?.customerName,
+      propertyName: reportData.customerInfo?.propertyName,
+    })
 
-    const reportId = crypto.randomUUID()
+    const reportId = globalThis.crypto.randomUUID()
     const timestamp = new Date().toISOString()
     const propertyName = reportData.customerInfo?.propertyName || "Unknown Property"
     const title = `${propertyName.replace(/\s+/g, "-")}_${Date.now()}`
+
+    console.log("[v0] Server Action: Prepared save data:", { reportId, title, timestamp })
 
     // Save to Supabase using Server Action
     const response = await fetch(`${process.env.SUPABASE_URL}/rest/v1/reports`, {
@@ -28,6 +36,8 @@ export async function saveReportToSupabase(reportData: any) {
         updated_at: timestamp,
       }),
     })
+
+    console.log("[v0] Server Action: Supabase response status:", response.status)
 
     if (!response.ok) {
       const errorText = await response.text()
