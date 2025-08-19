@@ -61,6 +61,12 @@ function UploadForm() {
   const [savedReports, setSavedReports] = useState<SavedReport[]>([])
   const [selectedReport, setSelectedReport] = useState<string>("")
   const [isLoadingReports, setIsLoadingReports] = useState(false)
+  const [processedData, setProcessedData] = useState<{
+    installationData: InstallationData[]
+    toiletCount: number
+    customerInfo: CustomerInfo
+  } | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     loadSavedReports()
@@ -194,7 +200,12 @@ function UploadForm() {
         return total + (isNaN(toiletQty) ? 0 : toiletQty)
       }, 0)
 
-      // Save all data synchronously
+      setProcessedData({
+        installationData,
+        toiletCount,
+        customerInfo: customerInfoWithDate,
+      })
+
       localStorage.setItem("rawInstallationData", JSON.stringify(installationData))
       localStorage.setItem("installationData", JSON.stringify(installationData))
       localStorage.setItem("customerInfo", JSON.stringify(customerInfoWithDate))
@@ -206,7 +217,6 @@ function UploadForm() {
         toiletCount: toiletCount,
       })
 
-      // Handle cover image if provided
       if (coverImage) {
         const reader = new FileReader()
         reader.onload = (e) => {
@@ -231,6 +241,47 @@ function UploadForm() {
     }
   }
 
+  const handleSaveProcessedData = async () => {
+    if (!processedData) {
+      alert("No processed data to save. Please generate a report first.")
+      return
+    }
+
+    try {
+      console.log("[v0] SAVE BUTTON CLICKED - Saving processed data directly from UploadForm")
+      setIsSaving(true)
+
+      const reportData = {
+        customerInfo: processedData.customerInfo,
+        installationData: processedData.installationData,
+        toiletCount: processedData.toiletCount,
+        reportNotes: [],
+        reportTitle: "",
+        letterText: "",
+        signatureName: "",
+        signatureTitle: "",
+      }
+
+      console.log("[v0] About to call saveReportToSupabase Server Action...")
+      const result = await saveReportToSupabase(reportData)
+
+      if (result.success) {
+        console.log("[v0] Report saved via Server Action successfully")
+        alert(
+          `Report saved to cloud storage!\nProperty: ${processedData.customerInfo.propertyName}\nSaved at: ${new Date().toLocaleString()}\n\nYour report is now accessible from any device.`,
+        )
+        await loadSavedReports()
+      } else {
+        throw new Error(result.message || "Failed to save to cloud storage")
+      }
+    } catch (error) {
+      console.error("[v0] Error saving processed data:", error)
+      alert("Error saving report to cloud storage. Please try again.")
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
       <Card>
@@ -239,21 +290,29 @@ function UploadForm() {
             <h1 className="text-2xl font-bold">Water Installation Report Generator</h1>
           </div>
 
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <h2 className="text-lg font-semibold mb-2 text-blue-800">📋 How to Save Reports to Cloud Storage</h2>
-            <ol className="list-decimal list-inside space-y-1 text-blue-700">
-              <li>Fill out customer information below</li>
-              <li>Upload your Excel/CSV file with installation data</li>
-              <li>Click "Generate Report" to create your report</li>
-              <li>Once the report is generated, you'll see a "Save to Cloud" button</li>
-              <li>Click "Save to Cloud" to store your report in Supabase for future access</li>
-            </ol>
-            <p className="mt-2 text-sm text-blue-600 font-medium">
-              ⚠️ The save button is only available AFTER generating a report, not on this upload form.
-            </p>
-          </div>
+          {processedData && (
+            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-green-800">✅ Report Generated Successfully!</h3>
+                  <p className="text-green-700">
+                    Processed {processedData.installationData.length} units for{" "}
+                    {processedData.customerInfo.propertyName}
+                  </p>
+                </div>
+                <Button
+                  onClick={handleSaveProcessedData}
+                  disabled={isSaving}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  <Save className="mr-2 h-4 w-4" />
+                  {isSaving ? "Saving to Cloud..." : "Save to Cloud"}
+                </Button>
+              </div>
+            </div>
+          )}
 
-          <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
             {isLoadingReports ? (
               <p className="text-gray-600">Loading saved reports from cloud storage...</p>
             ) : savedReports.length > 0 ? (
@@ -417,7 +476,15 @@ function ReportView({
   useEffect(() => {
     console.log("[v0] REPORT VIEW COMPONENT RENDERED - Save button IS available here")
     console.log("[v0] isSaving initial state:", isSaving)
+    console.log("[v0] Save button should be enabled:", !isSaving)
+    console.log("[v0] Customer info available:", !!customerInfo)
+    console.log("[v0] Installation data length:", installationData.length)
   }, [])
+
+  useEffect(() => {
+    console.log("[v0] isSaving state changed to:", isSaving)
+    console.log("[v0] Save button should be enabled:", !isSaving)
+  }, [isSaving])
 
   useEffect(() => {
     const storedImages = localStorage.getItem("reportImages")
@@ -521,9 +588,20 @@ function ReportView({
               console.log("[v0] BUTTON CLICK EVENT TRIGGERED")
               console.log("[v0] Button disabled state:", isSaving)
               console.log("[v0] Event object:", e)
-              handleSaveReport()
+              console.log("[v0] About to call handleSaveReport function")
+              console.log("[v0] Current timestamp:", new Date().toISOString())
+              try {
+                handleSaveReport()
+                console.log("[v0] handleSaveReport called successfully")
+              } catch (error) {
+                console.error("[v0] Error calling handleSaveReport:", error)
+              }
             }}
             disabled={isSaving}
+            onMouseDown={() => console.log("[v0] Save button mouse down")}
+            onMouseUp={() => console.log("[v0] Save button mouse up")}
+            onFocus={() => console.log("[v0] Save button focused")}
+            onBlur={() => console.log("[v0] Save button blurred")}
           >
             <Save className="mr-2 h-4 w-4" />
             {isSaving ? "Saving to Cloud..." : "Save to Cloud"}
@@ -679,7 +757,6 @@ function ReportContent() {
 
       let hasValidData = false
 
-      // Load customer info first
       if (storedCustomerInfo) {
         try {
           const parsedCustomerInfo = JSON.parse(storedCustomerInfo)
@@ -691,7 +768,6 @@ function ReportContent() {
         }
       }
 
-      // Load installation data
       if (storedInstallationData) {
         try {
           const parsedInstallationData = JSON.parse(storedInstallationData)
@@ -708,7 +784,6 @@ function ReportContent() {
             setToiletCount(parsedToiletCount)
             hasValidData = true
 
-            // Generate schema and notes
             const firstItem = parsedInstallationData[0]
             const schema = Object.keys(firstItem).map((key) => ({
               name: key,
@@ -718,7 +793,6 @@ function ReportContent() {
             setCsvSchema(schema)
             setFilteredData(parsedInstallationData)
 
-            // Generate notes from data
             const notes = parsedInstallationData
               .filter(
                 (item: InstallationData) =>
@@ -770,7 +844,6 @@ function ReportContent() {
         setFilteredData([])
         setReportNotes([])
         setToiletCount(0)
-        console.log("[v0] No valid data found, staying in UploadForm")
       }
     } catch (error) {
       console.error("[v0] Error loading data:", error)
