@@ -3,6 +3,14 @@
 import { revalidatePath } from "next/cache"
 
 export async function saveReportToSupabase(reportData: any) {
+  console.log("[v0] Server Action: STARTING save function")
+  console.log("[v0] Server Action: Environment variables check:", {
+    hasSupabaseUrl: !!process.env.SUPABASE_URL,
+    hasServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+    hasAnonKey: !!process.env.SUPABASE_ANON_KEY,
+    supabaseUrl: process.env.SUPABASE_URL?.substring(0, 30) + "...",
+  })
+
   try {
     console.log("[v0] Server Action: Saving report to Supabase")
     console.log("[v0] Server Action: Report data received:", {
@@ -12,6 +20,14 @@ export async function saveReportToSupabase(reportData: any) {
       propertyName: reportData.customerInfo?.propertyName,
     })
 
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.SUPABASE_ANON_KEY) {
+      console.error("[v0] Server Action: Missing required environment variables")
+      return {
+        success: false,
+        message: "Server configuration error - missing environment variables",
+      }
+    }
+
     const reportId = globalThis.crypto.randomUUID()
     const timestamp = new Date().toISOString()
     const propertyName = reportData.customerInfo?.propertyName || "Unknown Property"
@@ -19,7 +35,6 @@ export async function saveReportToSupabase(reportData: any) {
 
     console.log("[v0] Server Action: Prepared save data:", { reportId, title, timestamp })
 
-    // Save to Supabase using Server Action
     const response = await fetch(`${process.env.SUPABASE_URL}/rest/v1/reports`, {
       method: "POST",
       headers: {
@@ -50,7 +65,6 @@ export async function saveReportToSupabase(reportData: any) {
 
     console.log("[v0] Server Action: Successfully saved report to Supabase")
 
-    // Revalidate the reports list
     revalidatePath("/")
 
     return {
