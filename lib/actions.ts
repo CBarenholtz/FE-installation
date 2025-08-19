@@ -8,10 +8,9 @@ export async function saveReportToSupabase(reportData: any) {
   console.log("[v0] Server Action: STARTING save function")
 
   try {
-    const cookieStore = cookies()
-    const supabase = createServerActionClient({ cookies: () => cookieStore })
+    const supabase = createServerActionClient({ cookies })
 
-    console.log("[v0] Server Action: Saving report to Supabase")
+    console.log("[v0] Server Action: Supabase client created, proceeding with save")
     console.log("[v0] Server Action: Report data received:", {
       hasCustomerInfo: !!reportData.customerInfo,
       hasInstallationData: !!reportData.installationData,
@@ -35,7 +34,7 @@ export async function saveReportToSupabase(reportData: any) {
     })
 
     if (error) {
-      console.error("[v0] Server Action: Supabase save error:", error)
+      console.error("[v0] Server Action: Supabase error:", error)
       return {
         success: false,
         message: "Failed to save report to cloud storage",
@@ -64,8 +63,7 @@ export async function loadReportsFromSupabase() {
   try {
     console.log("[v0] Server Action: Loading reports from Supabase")
 
-    const cookieStore = cookies()
-    const supabase = createServerActionClient({ cookies: () => cookieStore })
+    const supabase = createServerActionClient({ cookies })
 
     const { data: reports, error } = await supabase
       .from("reports")
@@ -74,7 +72,7 @@ export async function loadReportsFromSupabase() {
       .limit(15)
 
     if (error) {
-      console.error("[v0] Server Action: Supabase query error:", error)
+      console.error("[v0] Server Action: Supabase error:", error)
       return {
         success: true,
         reports: [],
