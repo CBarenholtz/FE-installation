@@ -1,9 +1,9 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 
-export async function POST(request: NextRequest) {
-  console.log("[v0] Save route called - using Supabase cloud storage")
-
+export async function POST(request: Request) {
   try {
+    console.log("[v0] Save route called - using Supabase cloud storage")
+
     const body = await request.json()
     console.log("[v0] Received save request for:", body.title || "untitled report")
 
