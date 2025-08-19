@@ -200,10 +200,20 @@ function UploadForm() {
         return total + (isNaN(toiletQty) ? 0 : toiletQty)
       }, 0)
 
+      const dataToSave = {
+        installationData,
+        customerInfo: customerInfoWithDate,
+        toiletCount,
+      }
+
+      // Save with multiple keys to ensure data persistence
       localStorage.setItem("rawInstallationData", JSON.stringify(installationData))
       localStorage.setItem("installationData", JSON.stringify(installationData))
       localStorage.setItem("customerInfo", JSON.stringify(customerInfoWithDate))
       localStorage.setItem("toiletCount", JSON.stringify(toiletCount))
+
+      // Force localStorage to flush
+      localStorage.setItem("dataReady", "true")
 
       console.log("[v0] Data saved to localStorage:", {
         installationDataLength: installationData.length,
@@ -217,30 +227,38 @@ function UploadForm() {
         customerInfo: customerInfoWithDate,
       })
 
-      console.log("[v0] Saving processed data directly to cloud storage...")
+      console.log("[v0] Attempting to save to cloud storage...")
 
       const reportData = {
         customerInfo: customerInfoWithDate,
         installationData,
         toiletCount,
         reportNotes: [],
-        reportTitle: "",
+        reportTitle: `${customerInfoWithDate.propertyName} - ${customerInfoWithDate.customerName}`,
         letterText: "",
         signatureName: "",
         signatureTitle: "",
       }
 
       try {
-        const result = await saveReportToSupabase(reportData)
+        console.log("[v0] Calling saveReportToSupabase with data:", {
+          hasCustomerInfo: !!reportData.customerInfo,
+          customerName: reportData.customerInfo?.customerName,
+          installationDataLength: reportData.installationData?.length,
+          toiletCount: reportData.toiletCount,
+        })
 
-        if (result.success) {
-          console.log("[v0] Report automatically saved to cloud storage")
+        const result = await saveReportToSupabase(reportData)
+        console.log("[v0] saveReportToSupabase result:", result)
+
+        if (result && result.success) {
+          console.log("[v0] Report automatically saved to cloud storage successfully")
           alert(
             `✅ Report Generated and Saved Successfully!\n\nProperty: ${customerInfoWithDate.propertyName}\nUnits Processed: ${installationData.length}\nSaved to Cloud: ${new Date().toLocaleString()}\n\nYour report is now accessible from any device.`,
           )
         } else {
-          console.log("[v0] Cloud save failed, saving to localStorage as backup")
-          throw new Error("Cloud save failed")
+          console.log("[v0] Cloud save failed with result:", result)
+          throw new Error(result?.message || "Cloud save returned failure")
         }
       } catch (cloudSaveError) {
         console.error("[v0] Cloud save error:", cloudSaveError)
@@ -252,17 +270,17 @@ function UploadForm() {
         reader.onload = (e) => {
           const imageData = e.target?.result as string
           localStorage.setItem("coverImage", imageData)
-          console.log("[v0] Cover image saved, reloading page...")
+          console.log("[v0] Cover image saved, reloading page in 1 second...")
           setTimeout(() => {
             window.location.reload()
-          }, 500)
+          }, 1000)
         }
         reader.readAsDataURL(coverImage)
       } else {
-        console.log("[v0] No cover image, reloading page...")
+        console.log("[v0] No cover image, reloading page in 1 second...")
         setTimeout(() => {
           window.location.reload()
-        }, 500)
+        }, 1000)
       }
     } catch (error) {
       console.error("Error processing file:", error)
