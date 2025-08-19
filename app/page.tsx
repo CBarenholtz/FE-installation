@@ -66,6 +66,10 @@ function UploadForm() {
     loadSavedReports()
   }, [])
 
+  useEffect(() => {
+    console.log("[v0] UPLOAD FORM COMPONENT RENDERED - Save button is NOT available here")
+  }, [])
+
   const loadSavedReports = async () => {
     try {
       setIsLoadingReports(true)
@@ -212,8 +216,21 @@ function UploadForm() {
             <h1 className="text-2xl font-bold">Water Installation Report Generator</h1>
           </div>
 
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <h2 className="text-lg font-semibold mb-2 text-blue-800">📋 How to Save Reports to Cloud Storage</h2>
+            <ol className="list-decimal list-inside space-y-1 text-blue-700">
+              <li>Fill out customer information below</li>
+              <li>Upload your Excel/CSV file with installation data</li>
+              <li>Click "Generate Report" to create your report</li>
+              <li>Once the report is generated, you'll see a "Save to Cloud" button</li>
+              <li>Click "Save to Cloud" to store your report in Supabase for future access</li>
+            </ol>
+            <p className="mt-2 text-sm text-blue-600 font-medium">
+              ⚠️ The save button is only available AFTER generating a report, not on this upload form.
+            </p>
+          </div>
+
           <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-            <h2 className="text-lg font-semibold mb-3">Load Recent Report (15 Most Recent)</h2>
             {isLoadingReports ? (
               <p className="text-gray-600">Loading saved reports from cloud storage...</p>
             ) : savedReports.length > 0 ? (
@@ -373,6 +390,11 @@ function ReportView({
   const [currentPage, setCurrentPage] = useState("cover")
   const [images, setImages] = useState<ImageData[]>([])
   const [isSaving, setIsSaving] = useState(false)
+
+  useEffect(() => {
+    console.log("[v0] REPORT VIEW COMPONENT RENDERED - Save button IS available here")
+    console.log("[v0] isSaving initial state:", isSaving)
+  }, [])
 
   useEffect(() => {
     const storedImages = localStorage.getItem("reportImages")
@@ -618,15 +640,30 @@ function ReportContent() {
   const loadData = useCallback(() => {
     try {
       console.log("[v0] Loading data from localStorage for current session")
-      const storedInstallationData = localStorage.getItem("installationData")
+      const storedInstallationData =
+        localStorage.getItem("installationData") || localStorage.getItem("rawInstallationData")
       const storedToiletCount = localStorage.getItem("toiletCount")
+      const storedCustomerInfo = localStorage.getItem("customerInfo")
 
-      if (storedInstallationData && storedToiletCount) {
+      console.log("[v0] Found stored data:", {
+        hasInstallationData: !!storedInstallationData,
+        hasToiletCount: !!storedToiletCount,
+        hasCustomerInfo: !!storedCustomerInfo,
+      })
+
+      if (storedInstallationData && storedCustomerInfo) {
         const parsedInstallationData = JSON.parse(storedInstallationData)
-        const parsedToiletCount = JSON.parse(storedToiletCount)
+        const parsedToiletCount = storedToiletCount ? JSON.parse(storedToiletCount) : 0
+
+        console.log("[v0] Parsed data:", {
+          installationDataLength: parsedInstallationData.length,
+          toiletCount: parsedToiletCount,
+        })
 
         setInstallationData(parsedInstallationData)
         setToiletCount(parsedToiletCount)
+
+        localStorage.setItem("installationData", JSON.stringify(parsedInstallationData))
 
         if (parsedInstallationData && parsedInstallationData.length > 0) {
           const firstItem = parsedInstallationData[0]
