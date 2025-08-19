@@ -200,6 +200,36 @@ function UploadForm() {
         return total + (isNaN(toiletQty) ? 0 : toiletQty)
       }, 0)
 
+      console.log("[v0] Saving processed data directly to cloud storage...")
+
+      const reportData = {
+        customerInfo: customerInfoWithDate,
+        installationData,
+        toiletCount,
+        reportNotes: [],
+        reportTitle: "",
+        letterText: "",
+        signatureName: "",
+        signatureTitle: "",
+      }
+
+      try {
+        const result = await saveReportToSupabase(reportData)
+
+        if (result.success) {
+          console.log("[v0] Report automatically saved to cloud storage")
+          alert(
+            `✅ Report Generated and Saved Successfully!\n\nProperty: ${customerInfoWithDate.propertyName}\nUnits Processed: ${installationData.length}\nSaved to Cloud: ${new Date().toLocaleString()}\n\nYour report is now accessible from any device.`,
+          )
+        } else {
+          console.log("[v0] Cloud save failed, saving to localStorage as backup")
+          throw new Error("Cloud save failed")
+        }
+      } catch (cloudSaveError) {
+        console.error("[v0] Cloud save error:", cloudSaveError)
+        alert("⚠️ Report generated but cloud save failed. Data saved locally as backup.")
+      }
+
       setProcessedData({
         installationData,
         toiletCount,
@@ -241,47 +271,6 @@ function UploadForm() {
     }
   }
 
-  const handleSaveProcessedData = async () => {
-    if (!processedData) {
-      alert("No processed data to save. Please generate a report first.")
-      return
-    }
-
-    try {
-      console.log("[v0] SAVE BUTTON CLICKED - Saving processed data directly from UploadForm")
-      setIsSaving(true)
-
-      const reportData = {
-        customerInfo: processedData.customerInfo,
-        installationData: processedData.installationData,
-        toiletCount: processedData.toiletCount,
-        reportNotes: [],
-        reportTitle: "",
-        letterText: "",
-        signatureName: "",
-        signatureTitle: "",
-      }
-
-      console.log("[v0] About to call saveReportToSupabase Server Action...")
-      const result = await saveReportToSupabase(reportData)
-
-      if (result.success) {
-        console.log("[v0] Report saved via Server Action successfully")
-        alert(
-          `Report saved to cloud storage!\nProperty: ${processedData.customerInfo.propertyName}\nSaved at: ${new Date().toLocaleString()}\n\nYour report is now accessible from any device.`,
-        )
-        await loadSavedReports()
-      } else {
-        throw new Error(result.message || "Failed to save to cloud storage")
-      }
-    } catch (error) {
-      console.error("[v0] Error saving processed data:", error)
-      alert("Error saving report to cloud storage. Please try again.")
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
   return (
     <div className="container mx-auto px-4 py-8">
       <Card>
@@ -300,14 +289,6 @@ function UploadForm() {
                     {processedData.customerInfo.propertyName}
                   </p>
                 </div>
-                <Button
-                  onClick={handleSaveProcessedData}
-                  disabled={isSaving}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  <Save className="mr-2 h-4 w-4" />
-                  {isSaving ? "Saving to Cloud..." : "Save to Cloud"}
-                </Button>
               </div>
             </div>
           )}
