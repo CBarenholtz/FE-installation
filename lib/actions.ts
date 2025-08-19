@@ -1,15 +1,13 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { createServerActionClient } from "@supabase/auth-helpers-nextjs"
-import { cookies } from "next/headers"
+import { createClient } from "@supabase/supabase-js"
 
 export async function saveReportDirectly(reportData: any) {
   console.log("[v0] FIXED SAVE METHOD: Starting direct save to Supabase")
 
   try {
-    const cookieStore = cookies()
-    const supabase = createServerActionClient({ cookies: () => cookieStore })
+    const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!)
 
     const reportId = `report_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
     const timestamp = new Date().toISOString()
@@ -66,8 +64,7 @@ export async function loadReportsFromSupabase() {
   try {
     console.log("[v0] Server Action: Loading reports from Supabase")
 
-    const cookieStore = cookies()
-    const supabase = createServerActionClient({ cookies: () => cookieStore })
+    const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!)
 
     const { data: reports, error } = await supabase
       .from("reports")
