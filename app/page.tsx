@@ -173,6 +173,7 @@ function UploadForm() {
     setIsProcessing(true)
 
     try {
+      console.log("[v0] Starting Excel file processing...")
       const installationData = await parseExcelFile(file)
 
       if (installationData.length === 0) {
@@ -181,32 +182,47 @@ function UploadForm() {
         return
       }
 
-      localStorage.setItem("rawInstallationData", JSON.stringify(installationData))
-      localStorage.setItem("installationData", JSON.stringify(installationData))
-      localStorage.setItem(
-        "customerInfo",
-        JSON.stringify({
-          ...customerInfo,
-          date: new Date().toLocaleDateString(),
-        }),
-      )
+      console.log("[v0] Excel processing complete, saving data to localStorage...")
+
+      const customerInfoWithDate = {
+        ...customerInfo,
+        date: new Date().toLocaleDateString(),
+      }
 
       const toiletCount = installationData.reduce((total, item) => {
         const toiletQty = Number.parseInt(item["Toilet"] || "0", 10)
         return total + (isNaN(toiletQty) ? 0 : toiletQty)
       }, 0)
+
+      // Save all data synchronously
+      localStorage.setItem("rawInstallationData", JSON.stringify(installationData))
+      localStorage.setItem("installationData", JSON.stringify(installationData))
+      localStorage.setItem("customerInfo", JSON.stringify(customerInfoWithDate))
       localStorage.setItem("toiletCount", JSON.stringify(toiletCount))
 
+      console.log("[v0] Data saved to localStorage:", {
+        installationDataLength: installationData.length,
+        customerName: customerInfoWithDate.customerName,
+        toiletCount: toiletCount,
+      })
+
+      // Handle cover image if provided
       if (coverImage) {
         const reader = new FileReader()
         reader.onload = (e) => {
           const imageData = e.target?.result as string
           localStorage.setItem("coverImage", imageData)
-          window.location.reload()
+          console.log("[v0] Cover image saved, reloading page...")
+          setTimeout(() => {
+            window.location.reload()
+          }, 100)
         }
         reader.readAsDataURL(coverImage)
       } else {
-        window.location.reload()
+        console.log("[v0] No cover image, reloading page...")
+        setTimeout(() => {
+          window.location.reload()
+        }, 100)
       }
     } catch (error) {
       console.error("Error processing file:", error)
@@ -647,90 +663,114 @@ function ReportContent() {
   const loadData = useCallback(() => {
     try {
       console.log("[v0] Loading data from localStorage for current session")
+
       const storedInstallationData =
         localStorage.getItem("installationData") || localStorage.getItem("rawInstallationData")
       const storedToiletCount = localStorage.getItem("toiletCount")
       const storedCustomerInfo = localStorage.getItem("customerInfo")
 
-      console.log("[v0] Found stored data:", {
-        hasInstallationData: !!storedInstallationData,
-        hasToiletCount: !!storedToiletCount,
-        hasCustomerInfo: !!storedCustomerInfo,
+      console.log("[v0] Raw localStorage check:", {
+        installationDataExists: !!storedInstallationData,
+        installationDataLength: storedInstallationData ? JSON.parse(storedInstallationData).length : 0,
+        toiletCountExists: !!storedToiletCount,
+        customerInfoExists: !!storedCustomerInfo,
+        customerInfoLength: storedCustomerInfo ? storedCustomerInfo.length : 0,
       })
 
+      let hasValidData = false
+
+      // Load customer info first
       if (storedCustomerInfo) {
         try {
           const parsedCustomerInfo = JSON.parse(storedCustomerInfo)
           setCustomerInfo(parsedCustomerInfo)
           console.log("[v0] Loaded customerInfo into context:", parsedCustomerInfo.customerName)
+          hasValidData = true
         } catch (error) {
           console.error("[v0] Error parsing customerInfo:", error)
         }
       }
 
-      if (storedInstallationData && storedCustomerInfo) {
-        const parsedInstallationData = JSON.parse(storedInstallationData)
-        const parsedToiletCount = storedToiletCount ? JSON.parse(storedToiletCount) : 0
+      // Load installation data
+      if (storedInstallationData) {
+        try {
+          const parsedInstallationData = JSON.parse(storedInstallationData)
+          const parsedToiletCount = storedToiletCount ? JSON.parse(storedToiletCount) : 0
 
-        console.log("[v0] Parsed data:", {
-          installationDataLength: parsedInstallationData.length,
-          toiletCount: parsedToiletCount,
-        })
-
-        setInstallationData(parsedInstallationData)
-        setToiletCount(parsedToiletCount)
-
-        localStorage.setItem("installationData", JSON.stringify(parsedInstallationData))
-
-        if (parsedInstallationData && parsedInstallationData.length > 0) {
-          const firstItem = parsedInstallationData[0]
-          const schema = Object.keys(firstItem).map((key) => ({
-            name: key,
-            type: typeof firstItem[key],
-            exampleValue: firstItem[key],
-          }))
-          setCsvSchema(schema)
-        }
-
-        setFilteredData(parsedInstallationData)
-
-        const notes = parsedInstallationData
-          .filter(
-            (item: InstallationData) =>
-              item["Leak Issue Kitchen Faucet"] ||
-              item["Leak Issue Bath Faucet"] ||
-              item["Tub Spout/Diverter Leak Issue"] === "Light" ||
-              item["Tub Spout/Diverter Leak Issue"] === "Moderate" ||
-              item["Tub Spout/Diverter Leak Issue"] === "Heavy" ||
-              (item.Notes && item.Notes.trim() !== ""),
-          )
-          .map((item: InstallationData) => {
-            let noteText = ""
-            if (item["Leak Issue Kitchen Faucet"]) noteText += "Dripping from kitchen faucet. "
-            if (item["Leak Issue Bath Faucet"]) noteText += "Dripping from bathroom faucet. "
-            if (item["Tub Spout/Diverter Leak Issue"] === "Light") noteText += "Light leak from tub spout/ diverter. "
-            if (item["Tub Spout/Diverter Leak Issue"] === "Moderate")
-              noteText += "Moderate leak from tub spout/diverter. "
-            if (item["Tub Spout/Diverter Leak Issue"] === "Heavy") noteText += "Heavy leak from tub spout/ diverter. "
-
-            if (item.Notes && item.Notes.trim() !== "") {
-              noteText += item.Notes + " "
-            }
-
-            return {
-              unit: item.Unit,
-              note: noteText.trim(),
-            }
+          console.log("[v0] Parsed installation data:", {
+            installationDataLength: parsedInstallationData.length,
+            toiletCount: parsedToiletCount,
+            firstUnit: parsedInstallationData[0]?.Unit || "N/A",
           })
-          .filter((note: Note) => note.note !== "")
 
-        console.log("Report: Generated notes from installation data:", notes)
-        setReportNotes(notes)
-      } else {
+          if (parsedInstallationData.length > 0) {
+            setInstallationData(parsedInstallationData)
+            setToiletCount(parsedToiletCount)
+            hasValidData = true
+
+            // Generate schema and notes
+            const firstItem = parsedInstallationData[0]
+            const schema = Object.keys(firstItem).map((key) => ({
+              name: key,
+              type: typeof firstItem[key],
+              exampleValue: firstItem[key],
+            }))
+            setCsvSchema(schema)
+            setFilteredData(parsedInstallationData)
+
+            // Generate notes from data
+            const notes = parsedInstallationData
+              .filter(
+                (item: InstallationData) =>
+                  item["Leak Issue Kitchen Faucet"] ||
+                  item["Leak Issue Bath Faucet"] ||
+                  item["Tub Spout/Diverter Leak Issue"] === "Light" ||
+                  item["Tub Spout/Diverter Leak Issue"] === "Moderate" ||
+                  item["Tub Spout/Diverter Leak Issue"] === "Heavy" ||
+                  (item.Notes && item.Notes.trim() !== ""),
+              )
+              .map((item: InstallationData) => {
+                let noteText = ""
+                if (item["Leak Issue Kitchen Faucet"]) noteText += "Dripping from kitchen faucet. "
+                if (item["Leak Issue Bath Faucet"]) noteText += "Dripping from bathroom faucet. "
+                if (item["Tub Spout/Diverter Leak Issue"] === "Light")
+                  noteText += "Light leak from tub spout/ diverter. "
+                if (item["Tub Spout/Diverter Leak Issue"] === "Moderate")
+                  noteText += "Moderate leak from tub spout/diverter. "
+                if (item["Tub Spout/Diverter Leak Issue"] === "Heavy")
+                  noteText += "Heavy leak from tub spout/ diverter. "
+
+                if (item.Notes && item.Notes.trim() !== "") {
+                  noteText += item.Notes + " "
+                }
+
+                return {
+                  unit: item.Unit,
+                  note: noteText.trim(),
+                }
+              })
+              .filter((note: Note) => note.note !== "")
+
+            setReportNotes(notes)
+            console.log("[v0] Generated notes from installation data:", notes.length)
+          }
+        } catch (error) {
+          console.error("[v0] Error parsing installation data:", error)
+        }
+      }
+
+      console.log("[v0] Final data loading result:", {
+        hasValidData,
+        hasCustomerInfo: !!customerInfo,
+        installationDataLength: installationData.length,
+      })
+
+      if (!hasValidData) {
         setInstallationData([])
         setFilteredData([])
         setReportNotes([])
         setToiletCount(0)
+        console.log("[v0] No valid data found, staying in UploadForm")
       }
     } catch (error) {
       console.error("[v0] Error loading data:", error)
