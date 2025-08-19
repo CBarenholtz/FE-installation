@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { crypto } from "crypto"
 
 export async function GET() {
   try {
@@ -54,5 +55,67 @@ export async function GET() {
       reports: [],
       message: "No reports found",
     })
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    console.log("[v0] Save route called via list route - using Supabase cloud storage")
+
+    const body = await request.json()
+    console.log("[v0] Received save request with data")
+
+    // Generate unique ID and title
+    const reportId = crypto.randomUUID()
+    const timestamp = new Date().toISOString()
+    const propertyName = body.customerInfo?.propertyName || "Unknown Property"
+    const title = `${propertyName.replace(/\s+/g, "-")}_${Date.now()}`
+
+    // Save to Supabase
+    const saveResponse = await fetch(`${process.env.SUPABASE_URL}/rest/v1/reports`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+        apikey: process.env.SUPABASE_ANON_KEY!,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({
+        id: reportId,
+        title: title,
+        data: body,
+        created_at: timestamp,
+        updated_at: timestamp,
+      }),
+    })
+
+    if (!saveResponse.ok) {
+      const errorText = await saveResponse.text()
+      console.error("[v0] Supabase save error:", errorText)
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Failed to save report to cloud storage",
+        },
+        { status: 500 },
+      )
+    }
+
+    console.log("[v0] Successfully saved report to Supabase cloud storage")
+
+    return NextResponse.json({
+      success: true,
+      message: "Report saved to cloud storage successfully!",
+      reportId: reportId,
+    })
+  } catch (error) {
+    console.error("[v0] Error saving report:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Failed to save report",
+      },
+      { status: 500 },
+    )
   }
 }

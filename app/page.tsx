@@ -410,12 +410,12 @@ function ReportView({
         signatureTitle: localStorage.getItem("signatureTitle"),
       }
 
-      const response = await fetch("/api/reports/save", {
+      const response = await fetch("/api/reports/list", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ reportData }),
+        body: JSON.stringify(reportData),
       })
 
       if (response.ok) {
