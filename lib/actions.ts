@@ -6,8 +6,7 @@ export async function saveReportDirectly(reportData: any) {
   console.log("[v0] NEW SAVE METHOD: Starting direct save to Supabase")
 
   try {
-    // Use environment variables that are definitely available
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseUrl = process.env.SUPABASE_URL
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
     console.log("[v0] NEW SAVE METHOD: Environment check:", {
