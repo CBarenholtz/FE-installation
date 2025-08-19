@@ -1,36 +1,15 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { createServerActionClient } from "@supabase/auth-helpers-nextjs"
+import { cookies } from "next/headers"
 
 export async function saveReportDirectly(reportData: any) {
   console.log("[v0] FIXED SAVE METHOD: Starting direct save to Supabase")
 
   try {
-    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseKey =
-      process.env.SUPABASE_SERVICE_ROLE_KEY ||
-      process.env.SUPABASE_ANON_KEY ||
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-    console.log("[v0] FIXED SAVE METHOD: Environment check:", {
-      hasUrl: !!supabaseUrl,
-      hasKey: !!supabaseKey,
-      urlValue: supabaseUrl ? supabaseUrl.substring(0, 20) + "..." : "missing",
-      allEnvVars: {
-        SUPABASE_URL: !!process.env.SUPABASE_URL,
-        NEXT_PUBLIC_SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-        SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-        SUPABASE_ANON_KEY: !!process.env.SUPABASE_ANON_KEY,
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      },
-    })
-
-    if (!supabaseUrl || !supabaseKey) {
-      return {
-        success: false,
-        message: `Missing Supabase configuration - URL: ${!!supabaseUrl}, Key: ${!!supabaseKey}`,
-      }
-    }
+    const cookieStore = cookies()
+    const supabase = createServerActionClient({ cookies: () => cookieStore })
 
     const reportId = `report_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
     const timestamp = new Date().toISOString()
@@ -56,29 +35,17 @@ export async function saveReportDirectly(reportData: any) {
       dataSize: JSON.stringify(savePayload.data).length,
     })
 
-    const response = await fetch(`${supabaseUrl}/rest/v1/reports`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${supabaseKey}`,
-        apikey: supabaseKey,
-        Prefer: "return=representation",
-      },
-      body: JSON.stringify(savePayload),
-    })
+    const { data, error } = await supabase.from("reports").insert(savePayload).select()
 
-    const responseText = await response.text()
-    console.log("[v0] FIXED SAVE METHOD: Response status:", response.status)
-    console.log("[v0] FIXED SAVE METHOD: Response text:", responseText)
-
-    if (!response.ok) {
+    if (error) {
+      console.error("[v0] FIXED SAVE METHOD: Supabase error:", error)
       return {
         success: false,
-        message: `Save failed: ${response.status} - ${responseText}`,
+        message: `Save failed: ${error.message}`,
       }
     }
 
-    console.log("[v0] FIXED SAVE METHOD: Successfully saved report!")
+    console.log("[v0] FIXED SAVE METHOD: Successfully saved report!", data)
     revalidatePath("/")
 
     return {
@@ -99,39 +66,23 @@ export async function loadReportsFromSupabase() {
   try {
     console.log("[v0] Server Action: Loading reports from Supabase")
 
-    const supabaseUrl = process.env.SUPABASE_URL
-    const supabaseKey = process.env.SUPABASE_ANON_KEY
+    const cookieStore = cookies()
+    const supabase = createServerActionClient({ cookies: () => cookieStore })
 
-    if (!supabaseUrl || !supabaseKey) {
-      console.error("[v0] Server Action: Missing environment variables for loading")
+    const { data: reports, error } = await supabase
+      .from("reports")
+      .select("id, title, created_at")
+      .order("created_at", { ascending: false })
+      .limit(15)
+
+    if (error) {
+      console.error("[v0] Server Action: Supabase error:", error)
       return {
         success: true,
         reports: [],
         message: "No reports found",
       }
     }
-
-    // Use Supabase REST API directly
-    const response = await fetch(
-      `${supabaseUrl}/rest/v1/reports?select=id,title,created_at&order=created_at.desc&limit=15`,
-      {
-        headers: {
-          Authorization: `Bearer ${supabaseKey}`,
-          apikey: supabaseKey,
-        },
-      },
-    )
-
-    if (!response.ok) {
-      console.error("[v0] Server Action: Supabase API error:", response.status)
-      return {
-        success: true,
-        reports: [],
-        message: "No reports found",
-      }
-    }
-
-    const reports = await response.json()
 
     const formattedReports = (reports || []).map((report: any) => {
       const parts = report.title.split("_")
