@@ -21,6 +21,7 @@ import ReportPicturesPage from "@/components/report-pictures-page"
 import { ReportProvider, useReportContext } from "@/lib/report-context"
 import { parseExcelFile } from "@/lib/excel-parser"
 import type { CustomerInfo, InstallationData, Note, ImageData } from "@/lib/types"
+import { saveReportToSupabase, loadReportsFromSupabase } from "@/lib/actions"
 
 interface SavedReport {
   id: string
@@ -68,27 +69,19 @@ function UploadForm() {
   const loadSavedReports = async () => {
     try {
       setIsLoadingReports(true)
-      console.log("[v0] Loading saved reports from Supabase cloud storage")
-      const response = await fetch("/api/reports/list")
+      console.log("[v0] Loading saved reports using Server Action")
 
-      if (response.ok) {
-        const data = await response.json()
-        const reports = data.reports.map((report: any) => ({
-          id: report.id,
-          propertyName: report.property_name,
-          timestamp: report.created_at,
-          customerName: report.property_name,
-          displayName: `${report.property_name} - ${new Date(report.created_at).toLocaleDateString()}`,
-        }))
+      const result = await loadReportsFromSupabase()
 
-        setSavedReports(reports)
-        console.log("[v0] Loaded reports from Supabase:", reports.length)
+      if (result.success) {
+        setSavedReports(result.reports)
+        console.log("[v0] Loaded reports via Server Action:", result.reports.length)
       } else {
-        console.log("[v0] Error loading reports from Supabase")
+        console.log("[v0] Error loading reports via Server Action")
         setSavedReports([])
       }
     } catch (error) {
-      console.log("[v0] Supabase error:", error)
+      console.log("[v0] Server Action error:", error)
       setSavedReports([])
     } finally {
       setIsLoadingReports(false)
@@ -395,7 +388,7 @@ function ReportView({
   const handleSaveReport = async () => {
     try {
       setIsSaving(true)
-      console.log("[v0] Saving report directly to Supabase cloud storage")
+      console.log("[v0] Saving report using Server Action")
 
       const reportData = {
         customerInfo,
@@ -410,16 +403,10 @@ function ReportView({
         signatureTitle: localStorage.getItem("signatureTitle"),
       }
 
-      const response = await fetch("/api/reports/list", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(reportData),
-      })
+      const result = await saveReportToSupabase(reportData)
 
-      if (response.ok) {
-        console.log("[v0] Report saved to Supabase cloud storage successfully")
+      if (result.success) {
+        console.log("[v0] Report saved via Server Action successfully")
         alert(
           `Report saved to cloud storage!\nProperty: ${customerInfo.propertyName}\nSaved at: ${new Date().toLocaleString()}\n\nYour report is now accessible from any device.`,
         )
@@ -427,10 +414,10 @@ function ReportView({
           onBack()
         }, 100)
       } else {
-        throw new Error("Failed to save to cloud storage")
+        throw new Error(result.message || "Failed to save to cloud storage")
       }
     } catch (error) {
-      console.error("[v0] Error saving report:", error)
+      console.error("[v0] Error saving report via Server Action:", error)
       alert("Error saving report to cloud storage. Please try again.")
     } finally {
       setIsSaving(false)
