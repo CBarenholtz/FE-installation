@@ -204,13 +204,13 @@ export default function ImageUpload({
             >
               ZIP File Upload
             </Button>
-            <Button
+            {/* <Button
               variant={uploadMethod === "googledrive" ? "default" : "outline"}
               onClick={() => setUploadMethod("googledrive")}
               size="sm"
             >
               Google Drive Links
-            </Button>
+            </Button> */}
           </div>
 
           {uploadMethod === "zip" && (
@@ -236,7 +236,7 @@ export default function ImageUpload({
             </div>
           )}
 
-          {uploadMethod === "googledrive" && (
+          {/* {uploadMethod === "googledrive" && (
             <div className="space-y-2">
               <Label htmlFor="gdrive-links">Google Drive Links or File IDs</Label>
               <textarea
@@ -251,7 +251,7 @@ export default function ImageUpload({
                 Add Images
               </Button>
             </div>
-          )}
+          )} */}
         </div>
 
         {/* Display uploaded images with editing capabilities */}
