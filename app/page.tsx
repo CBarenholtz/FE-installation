@@ -7,9 +7,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useRouter } from "next/navigation"
-import { ChevronLeft, Upload, Save, Download } from "lucide-react"
+import { ChevronLeft, Upload } from "lucide-react"
 import ReportCoverPage from "@/components/report-cover-page"
 import ReportLetterPage from "@/components/report-letter-page"
 import ReportNotesPage from "@/components/report-notes-page"
@@ -21,16 +20,6 @@ import ReportPicturesPage from "@/components/report-pictures-page"
 import { ReportProvider, useReportContext } from "@/lib/report-context"
 import { parseExcelFile } from "@/lib/excel-parser"
 import type { CustomerInfo, InstallationData, Note, ImageData } from "@/lib/types"
-import { saveReportToSupabase, loadReportsFromSupabase, saveReportDirectly } from "@/lib/actions"
-
-interface SavedReport {
-  id: string
-  propertyName: string
-  timestamp: string
-  customerName: string
-  displayName: string
-  url?: string
-}
 
 function LoadingState() {
   return (
@@ -58,96 +47,50 @@ function UploadForm() {
   })
   const [coverImage, setCoverImage] = useState<File | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
-  const [savedReports, setSavedReports] = useState<SavedReport[]>([])
-  const [selectedReport, setSelectedReport] = useState<string>("")
-  const [isLoadingReports, setIsLoadingReports] = useState(false)
   const [processedData, setProcessedData] = useState<{
     installationData: InstallationData[]
     toiletCount: number
     customerInfo: CustomerInfo
   } | null>(null)
-  const [isSaving, setIsSaving] = useState(false)
-
-  useEffect(() => {
-    loadSavedReports()
-  }, [])
+  
 
   useEffect(() => {
     console.log("[v0] UPLOAD FORM COMPONENT RENDERED - Save button is NOT available here")
+    
+    // Clear any leftover localStorage data from previous sessions
+    const itemsToRemove = [
+      "installationData",
+      "toiletCount", 
+      "customerInfo",
+      "rawInstallationData",
+      "coverImage",
+      "reportImages",
+      "selectedCells",
+      "selectedNotesColumns",
+      "reportNotes",
+      "reportTitle",
+      "letterText",
+      "signatureName",
+      "signatureTitle",
+      "editedUnits",
+      "rePrefix",
+      "dearPrefix",
+      "sectionTitles",
+      "coverImageSize",
+      "unifiedNotes",
+      "dataReady"
+    ]
+
+    itemsToRemove.forEach((item) => {
+      try {
+        localStorage.removeItem(item)
+      } catch (error) {
+        console.error(`Error removing ${item} from localStorage:`, error)
+      }
+    })
+
+    console.log("[v0] Cleared localStorage on component mount")
   }, [])
-
-  const loadSavedReports = async () => {
-    try {
-      setIsLoadingReports(true)
-      console.log("[v0] Loading saved reports using Server Action")
-
-      const result = await loadReportsFromSupabase()
-
-      if (result.success) {
-        setSavedReports(result.reports)
-        console.log("[v0] Loaded reports via Server Action:", result.reports.length)
-      } else {
-        console.log("[v0] Error loading reports via Server Action")
-        setSavedReports([])
-      }
-    } catch (error) {
-      console.log("[v0] Server Action error:", error)
-      setSavedReports([])
-    } finally {
-      setIsLoadingReports(false)
-    }
-  }
-
-  const handleLoadReport = async () => {
-    if (!selectedReport) return
-
-    try {
-      setIsProcessing(true)
-      console.log("[v0] Loading specific report using Server Action:", selectedReport)
-
-      const result = await loadReportsFromSupabase()
-
-      if (result.success) {
-        const selectedReportData = result.reports.find((report) => report.id === selectedReport)
-
-        if (selectedReportData && selectedReportData.data) {
-          const reportData = selectedReportData.data
-
-          if (reportData.customerInfo) {
-            localStorage.setItem("customerInfo", JSON.stringify(reportData.customerInfo))
-          }
-          if (reportData.installationData) {
-            localStorage.setItem("installationData", JSON.stringify(reportData.installationData))
-            localStorage.setItem("rawInstallationData", JSON.stringify(reportData.installationData))
-          }
-          if (reportData.toiletCount) {
-            localStorage.setItem("toiletCount", JSON.stringify(reportData.toiletCount))
-          }
-          if (reportData.reportImages) {
-            localStorage.setItem("reportImages", JSON.stringify(reportData.reportImages))
-          }
-          if (reportData.reportNotes) {
-            localStorage.setItem("reportNotes", JSON.stringify(reportData.reportNotes))
-          }
-          if (reportData.coverImage) {
-            localStorage.setItem("coverImage", reportData.coverImage)
-          }
-
-          console.log("[v0] Report loaded from Supabase using Server Action")
-          window.location.reload()
-        } else {
-          alert("Report not found. Please try again.")
-        }
-      } else {
-        alert("Error loading report. Please try again.")
-      }
-    } catch (error) {
-      console.error("[v0] Error loading report via Server Action:", error)
-      alert("Error loading report. Please try again.")
-    } finally {
-      setIsProcessing(false)
-    }
-  }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
@@ -176,6 +119,40 @@ function UploadForm() {
       return
     }
 
+    // Clear all localStorage data to start fresh for each new report
+    const itemsToRemove = [
+      "installationData",
+      "toiletCount", 
+      "customerInfo",
+      "rawInstallationData",
+      "coverImage",
+      "reportImages",
+      "selectedCells",
+      "selectedNotesColumns",
+      "reportNotes",
+      "reportTitle",
+      "letterText",
+      "signatureName",
+      "signatureTitle",
+      "editedUnits",
+      "rePrefix",
+      "dearPrefix",
+      "sectionTitles",
+      "coverImageSize",
+      "unifiedNotes",
+      "dataReady"
+    ]
+
+    itemsToRemove.forEach((item) => {
+      try {
+        localStorage.removeItem(item)
+      } catch (error) {
+        console.error(`Error removing ${item} from localStorage:`, error)
+      }
+    })
+
+    console.log("[v0] Cleared all localStorage data for new report")
+
     setIsProcessing(true)
 
     try {
@@ -188,6 +165,8 @@ function UploadForm() {
         return
       }
 
+      console.log("[v0] Excel data loaded, columns available:", Object.keys(installationData[0] || {}))
+      console.log("[v0] First row sample:", installationData[0])
       console.log("[v0] Excel processing complete, saving data to localStorage...")
 
       const customerInfoWithDate = {
@@ -195,15 +174,80 @@ function UploadForm() {
         date: new Date().toLocaleDateString(),
       }
 
-      const toiletCount = installationData.reduce((total, item) => {
-        const toiletQty = Number.parseInt(item["Toilet"] || "0", 10)
-        return total + (isNaN(toiletQty) ? 0 : toiletQty)
-      }, 0)
+             const toiletCount = installationData.reduce((total, item) => {
+         // First, try to find "Toilets Installed:" columns (these are the primary source)
+         const toiletsInstalledColumns = Object.keys(item).filter(key => 
+           key.startsWith("Toilets Installed:") || key.startsWith("toilets installed:")
+         )
+         
+         let toiletQty = 0
+         
+         // Check if any of these columns contain a total number in the header
+         for (const col of toiletsInstalledColumns) {
+           // Extract the number from the column header (e.g., "Toilets Installed: 361" -> 361)
+           const headerMatch = col.match(/Toilets Installed:\s*(\d+)/i)
+           if (headerMatch) {
+             const headerNumber = parseInt(headerMatch[1], 10)
+             if (!isNaN(headerNumber)) {
+               console.log(`[v0] Found total toilet count in header "${col}": ${headerNumber}`)
+               return headerNumber // Return this total immediately, don't sum rows
+             }
+           }
+         }
+         
+         // If no header number found, sum up the values from unit rows only
+         // Skip rows that look like headers or totals (e.g., no Unit field, or Unit is "Total")
+         if (item.Unit && item.Unit.toString().toLowerCase() !== 'total' && !item.Unit.toString().toLowerCase().includes('total')) {
+           for (const col of toiletsInstalledColumns) {
+             const value = item[col]
+             if (value !== undefined && value !== null && value !== "") {
+               const parsed = Number.parseInt(String(value), 10)
+               if (!isNaN(parsed)) {
+                 toiletQty += parsed
+                 console.log(`[v0] Found toilet count in unit row "${item.Unit}", column "${col}": ${value} -> ${parsed}`)
+               }
+             }
+           }
+           
+           // If no "Toilets Installed:" columns found, try generic toilet columns as fallback
+           if (toiletQty === 0) {
+             const possibleColumns = ["Toilet", "toilet", "TOILET", "Toilets", "toilets", "TOILETS"]
+             
+             for (const col of possibleColumns) {
+               if (item[col] !== undefined && item[col] !== null && item[col] !== "") {
+                 const parsed = Number.parseInt(String(item[col]), 10)
+                 if (!isNaN(parsed)) {
+                   toiletQty = parsed
+                   console.log(`[v0] Found toilet count in fallback column "${col}": ${item[col]} -> ${parsed}`)
+                   break
+                 }
+               }
+             }
+           }
+         } else {
+           console.log(`[v0] Skipping header/total row: ${item.Unit}`)
+         }
+         
+         console.log("[v0] Toilet count calculation for unit:", {
+           unit: item.Unit || "Unknown",
+           toiletsInstalledColumns: toiletsInstalledColumns,
+           toiletQty: toiletQty,
+           runningTotal: total + toiletQty
+         })
+         
+         return total + toiletQty
+       }, 0)
+
+      console.log("[v0] Final toilet count calculated:", toiletCount)
+
+      // If no toilet count found, set a fallback value
+      const finalToiletCount = toiletCount > 0 ? toiletCount : installationData.length
+      console.log("[v0] Final toilet count with fallback:", finalToiletCount)
 
       localStorage.setItem("rawInstallationData", JSON.stringify(installationData))
       localStorage.setItem("installationData", JSON.stringify(installationData))
       localStorage.setItem("customerInfo", JSON.stringify(customerInfoWithDate))
-      localStorage.setItem("toiletCount", JSON.stringify(toiletCount))
+      localStorage.setItem("toiletCount", JSON.stringify(finalToiletCount))
       localStorage.setItem("dataReady", "true")
 
       const verifyData = {
@@ -225,64 +269,32 @@ function UploadForm() {
 
       setProcessedData({
         installationData,
-        toiletCount,
+        toiletCount: finalToiletCount,
         customerInfo: customerInfoWithDate,
       })
 
-      console.log("[v0] Attempting to save to cloud storage...")
+      console.log("[v0] Processed data set:", {
+        installationDataLength: installationData.length,
+        toiletCount: finalToiletCount,
+        customerInfo: customerInfoWithDate
+      })
 
-      const reportData = {
-        customerInfo: customerInfoWithDate,
-        installationData,
-        toiletCount,
-        reportNotes: [],
-        reportTitle: `${customerInfoWithDate.propertyName} - ${customerInfoWithDate.customerName}`,
-        letterText: "",
-        signatureName: "",
-        signatureTitle: "",
-      }
-
-      try {
-        console.log("[v0] Calling saveReportToSupabase with data:", {
-          hasCustomerInfo: !!reportData.customerInfo,
-          customerName: reportData.customerInfo?.customerName,
-          installationDataLength: reportData.installationData?.length,
-          toiletCount: reportData.toiletCount,
-        })
-
-        const result = await saveReportToSupabase(reportData)
-        console.log("[v0] saveReportToSupabase result:", result)
-
-        if (result && result.success) {
-          console.log("[v0] Report automatically saved to cloud storage successfully")
-          alert(
-            `✅ Report Generated and Saved Successfully!\n\nProperty: ${customerInfoWithDate.propertyName}\nUnits Processed: ${installationData.length}\nSaved to Cloud: ${new Date().toLocaleString()}\n\nYour report is now accessible from any device.`,
-          )
-        } else {
-          console.log("[v0] Cloud save failed with result:", result)
-          throw new Error(result?.message || "Cloud save returned failure")
-        }
-      } catch (cloudSaveError) {
-        console.error("[v0] Cloud save error:", cloudSaveError)
-        alert("⚠️ Report generated but cloud save failed. Data saved locally as backup.")
-      }
+      // Cloud save for whole-report removed by request
 
       if (coverImage) {
         const reader = new FileReader()
         reader.onload = (e) => {
           const imageData = e.target?.result as string
           localStorage.setItem("coverImage", imageData)
-          console.log("[v0] Cover image saved, reloading page in 3 seconds...")
-          setTimeout(() => {
-            window.location.reload()
-          }, 3000)
+          console.log("[v0] Cover image saved, navigating to report view...")
+          // Navigate to report view instead of reloading
+          router.push("/report")
         }
         reader.readAsDataURL(coverImage)
       } else {
-        console.log("[v0] No cover image, reloading page in 3 seconds...")
-        setTimeout(() => {
-          window.location.reload()
-        }, 3000)
+        console.log("[v0] No cover image, navigating to report view...")
+        // Navigate to report view instead of reloading
+        router.push("/report")
       }
     } catch (error) {
       console.error("Error processing file:", error)
@@ -291,38 +303,7 @@ function UploadForm() {
     }
   }
 
-  const handleSaveProcessedData = async () => {
-    if (!processedData || isSaving) return
-
-    setIsSaving(true)
-    try {
-      console.log("[v0] Using NEW save method from UploadForm")
-
-      const reportData = {
-        customerInfo: processedData.customerInfo,
-        installationData: processedData.installationData,
-        toiletCount: processedData.toiletCount,
-        reportNotes: [],
-        reportTitle: `${processedData.customerInfo.propertyName} - ${processedData.customerInfo.customerName}`,
-        letterText: "",
-        signatureName: "",
-        signatureTitle: "",
-      }
-
-      const result = await saveReportDirectly(reportData)
-
-      if (result?.success) {
-        alert("✅ Report saved successfully to cloud storage!")
-      } else {
-        alert("❌ Failed to save report: " + (result?.message || "Unknown error"))
-      }
-    } catch (error) {
-      console.error("[v0] Save error:", error)
-      alert("❌ Error saving report: " + error)
-    } finally {
-      setIsSaving(false)
-    }
-  }
+  // Whole-report cloud save removed by request
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -341,55 +322,15 @@ function UploadForm() {
                     Processed {processedData.installationData.length} units for{" "}
                     {processedData.customerInfo.propertyName}
                   </p>
+                  <p className="text-green-700 font-medium">
+                    Toilets Installed: {processedData.toiletCount}
+                  </p>
                 </div>
-                <Button
-                  onClick={handleSaveProcessedData}
-                  disabled={isSaving}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  <Save className="mr-2 h-4 w-4" />
-                  {isSaving ? "Saving..." : "Save to Cloud"}
-                </Button>
               </div>
             </div>
           )}
 
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            {isLoadingReports ? (
-              <p className="text-gray-600">Loading saved reports from cloud storage...</p>
-            ) : savedReports.length > 0 ? (
-              <div className="space-y-3">
-                <div className="flex gap-3 items-end">
-                  <div className="flex-1">
-                    <Label htmlFor="savedReport">Select a recent report to load</Label>
-                    <Select value={selectedReport} onValueChange={setSelectedReport}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Choose a saved report..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {savedReports.map((report) => (
-                          <SelectItem key={report.id} value={report.id}>
-                            {report.displayName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button
-                    onClick={handleLoadReport}
-                    disabled={!selectedReport || isProcessing}
-                    variant="outline"
-                    className="flex items-center gap-2 bg-transparent"
-                  >
-                    <Download className="h-4 w-4" />
-                    {isProcessing ? "Loading..." : "Load Report"}
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <p className="text-gray-600">No saved reports found. Generate and save a report to see it here.</p>
-            )}
-          </div>
+          
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-4">
@@ -513,20 +454,15 @@ function ReportView({
   const router = useRouter()
   const [currentPage, setCurrentPage] = useState("cover")
   const [images, setImages] = useState<ImageData[]>([])
-  const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
-    console.log("[v0] REPORT VIEW COMPONENT RENDERED - Save button IS available here")
-    console.log("[v0] isSaving initial state:", isSaving)
-    console.log("[v0] Save button should be enabled:", !isSaving)
+    console.log("[v0] REPORT VIEW COMPONENT RENDERED")
     console.log("[v0] Customer info available:", !!customerInfo)
     console.log("[v0] Installation data length:", installationData.length)
+    console.log("[v0] Toilet count received:", toiletCount)
+    console.log("[v0] Toilet count type:", typeof toiletCount)
+    console.log("[v0] Notes count:", notes.length)
   }, [])
-
-  useEffect(() => {
-    console.log("[v0] isSaving state changed to:", isSaving)
-    console.log("[v0] Save button should be enabled:", !isSaving)
-  }, [isSaving])
 
   useEffect(() => {
     const storedImages = localStorage.getItem("reportImages")
@@ -544,68 +480,15 @@ function ReportView({
     localStorage.setItem("reportImages", JSON.stringify(uploadedImages))
   }
 
-  const handleSaveReport = async () => {
-    console.log("[v0] SAVE FUNCTION CALLED - IMMEDIATE LOG")
-    console.log("[v0] Environment check:", {
-      hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-      hasSupabaseAnonKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      hasSupabaseServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-    })
-
-    if (isSaving) {
-      console.log("[v0] Already saving, returning early")
-      return
-    }
-
-    setIsSaving(true)
-
-    try {
-      console.log("[v0] About to save report data")
-
-      const reportData = {
-        customerInfo,
-        installationData,
-        toiletCount,
-        reportNotes: notes,
-        reportTitle: `${customerInfo.propertyName} - ${customerInfo.customerName}`,
-        letterText: "",
-        signatureName: "",
-        signatureTitle: "",
-      }
-
-      console.log("[v0] Calling Server Action with data:", {
-        customerName: reportData.customerInfo?.customerName,
-        installationDataLength: reportData.installationData?.length,
-        toiletCount: reportData.toiletCount,
-      })
-
-      const result = await saveReportToSupabase(reportData)
-
-      console.log("[v0] Server Action result:", result)
-
-      if (result?.success) {
-        alert("✅ Report saved successfully to cloud storage!")
-      } else {
-        alert("❌ Failed to save report: " + (result?.message || "Unknown error"))
-      }
-    } catch (error) {
-      console.error("[v0] Save error:", error)
-      alert("❌ Error saving report: " + error)
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
   const handleBackWithSaveOption = () => {
     const hasData = installationData.length > 0 || images.length > 0 || notes.length > 0
 
     if (hasData) {
-      const shouldSave = confirm(
-        "You have unsaved work. Would you like to save this report to cloud storage before going back?\n\nClick OK to save, or Cancel to discard changes.",
+      const shouldGoBack = confirm(
+        "You have unsaved work. Going back will clear the current report from this session. Continue?",
       )
 
-      if (shouldSave) {
-        handleSaveReport()
+      if (!shouldGoBack) {
         return
       }
     }
@@ -617,16 +500,12 @@ function ReportView({
     <div className="container mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-8 print:hidden">
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={handleBackWithSaveOption} disabled={isSaving}>
+          <Button variant="outline" onClick={handleBackWithSaveOption}>
             <ChevronLeft className="mr-2 h-4 w-4" />
             Back to Form
           </Button>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={handleSaveReport} disabled={isSaving}>
-            <Save className="mr-2 h-4 w-4" />
-            {isSaving ? "Saving..." : "Save to Cloud"}
-          </Button>
           <ExcelExportButton
             customerInfo={customerInfo}
             installationData={installationData}
@@ -737,6 +616,12 @@ function ReportContent() {
         "signatureName",
         "signatureTitle",
         "editedUnits",
+        "rePrefix",
+        "dearPrefix",
+        "sectionTitles",
+        "coverImageSize",
+        "unifiedNotes",
+        "dataReady"
       ]
 
       itemsToRemove.forEach((item) => {
@@ -773,6 +658,7 @@ function ReportContent() {
         installationDataExists: !!storedInstallationData,
         installationDataLength: storedInstallationData ? JSON.parse(storedInstallationData).length : 0,
         toiletCountExists: !!storedToiletCount,
+        toiletCountRawValue: storedToiletCount,
         customerInfoExists: !!storedCustomerInfo,
         customerInfoLength: storedCustomerInfo ? storedCustomerInfo.length : 0,
       })
@@ -799,6 +685,7 @@ function ReportContent() {
           console.log("[v0] Parsed installation data:", {
             installationDataLength: parsedInstallationData.length,
             toiletCount: parsedToiletCount,
+            toiletCountType: typeof parsedToiletCount,
             firstUnit: parsedInstallationData[0]?.Unit || "N/A",
           })
 
@@ -806,6 +693,9 @@ function ReportContent() {
             setInstallationData(parsedInstallationData)
             setToiletCount(parsedToiletCount)
             hasInstallationDataLoaded = true
+
+            console.log("[v0] Set toilet count in context:", parsedToiletCount)
+            console.log("[v0] Set installation data:", parsedInstallationData.length, "items")
 
             const firstItem = parsedInstallationData[0]
             const schema = Object.keys(firstItem).map((key) => ({
