@@ -152,9 +152,9 @@ export default function ReportDetailPage({
     if (item["Tub Spout/Diverter Leak Issue"] === "Moderate") notes += "Moderate leak from tub spout/diverter. "
     if (item["Tub Spout/Diverter Leak Issue"] === "Heavy") notes += "Heavy leak from tub spout/ diverter. "
 
-    if (item.Notes && item.Notes.trim() !== "") {
-      notes += item.Notes + " "
-    }
+    //if (item.Notes && item.Notes.trim() !== "") {
+      //notes += item.Notes + " "
+    //}
 
     return formatNote(notes.trim())
   }

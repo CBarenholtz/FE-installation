@@ -30,6 +30,7 @@ function LoadingState() {
 }
 
 function NoDataState({ onBack }: { onBack: () => void }) {
+  // Always render UploadForm directly when no data
   return <UploadForm />
 }
 
@@ -493,6 +494,7 @@ function ReportView({
       }
     }
 
+    // Call onBack directly without any intermediate steps
     onBack()
   }
 
@@ -596,56 +598,75 @@ function ReportContent() {
   const [filteredData, setFilteredData] = useState<InstallationData[]>([])
   const [reportNotes, setReportNotes] = useState<Note[]>([])
   const [hasValidData, setHasValidData] = useState(false)
+  const [isNavigatingBack, setIsNavigatingBack] = useState(false)
 
   const handleBack = () => {
     try {
-      console.log("[v0] Starting handleBack - clearing all localStorage data")
+      console.log("[v0] Starting handleBack - navigating directly to form")
+      
+      // Navigate to form FIRST, before any state changes
+      router.push("/")
+      
+      // Then clear state and localStorage in the background
+      setTimeout(() => {
+        setIsNavigatingBack(true)
+        setInstallationData([])
+        setFilteredData([])
+        setReportNotes([])
+        setToiletCount(0)
+        setHasValidData(false)
+        setLoading(false)
+        
+        // Clear localStorage data
+        const itemsToRemove = [
+          "installationData",
+          "toiletCount",
+          "customerInfo",
+          "rawInstallationData",
+          "coverImage",
+          "reportImages",
+          "selectedCells",
+          "selectedNotesColumns",
+          "reportNotes",
+          "reportTitle",
+          "letterText",
+          "signatureName",
+          "signatureTitle",
+          "editedUnits",
+          "rePrefix",
+          "dearPrefix",
+          "sectionTitles",
+          "coverImageSize",
+          "unifiedNotes",
+          "dataReady"
+        ]
 
-      const itemsToRemove = [
-        "installationData",
-        "toiletCount",
-        "customerInfo",
-        "rawInstallationData",
-        "coverImage",
-        "reportImages",
-        "selectedCells",
-        "selectedNotesColumns",
-        "reportNotes",
-        "reportTitle",
-        "letterText",
-        "signatureName",
-        "signatureTitle",
-        "editedUnits",
-        "rePrefix",
-        "dearPrefix",
-        "sectionTitles",
-        "coverImageSize",
-        "unifiedNotes",
-        "dataReady"
-      ]
-
-      itemsToRemove.forEach((item) => {
-        try {
-          localStorage.removeItem(item)
-        } catch (error) {
-          console.error(`[v0] Error removing ${item} from localStorage:`, error)
-        }
-      })
-
-      setInstallationData([])
-      setFilteredData([])
-      setReportNotes([])
-      setToiletCount(0)
-      setLoading(true)
-
-      console.log("[v0] All localStorage data cleared and state reset")
+        itemsToRemove.forEach((item) => {
+          try {
+            localStorage.removeItem(item)
+          } catch (error) {
+            console.error(`[v0] Error removing ${item} from localStorage:`, error)
+          }
+        })
+        
+        console.log("[v0] All state cleared and localStorage cleaned in background")
+      }, 100)
+      
     } catch (error) {
       console.error("[v0] Error in handleBack:", error)
+      // Force navigation even if there's an error
       router.push("/")
     }
   }
 
-  const loadData = useCallback(() => {
+    const loadData = useCallback(() => {
+    // Don't load data if we're intentionally going back to form
+    if (isNavigatingBack) {
+      console.log("[v0] Skipping data load - navigating back to form")
+      setLoading(false)
+      return
+    }
+
     try {
       console.log("[v0] Loading data from localStorage for current session")
 
@@ -762,8 +783,10 @@ function ReportContent() {
         setFilteredData([])
         setReportNotes([])
         setToiletCount(0)
+        setHasValidData(false)
       } else {
         console.log("[v0] Valid data found, switching to ReportView")
+        setHasValidData(true)
       }
     } catch (error) {
       console.error("[v0] Error loading data:", error)
@@ -775,11 +798,14 @@ function ReportContent() {
     } finally {
       setLoading(false)
     }
-  }, [setToiletCount, setCustomerInfo])
+  }, [setToiletCount, setCustomerInfo, isNavigatingBack])
 
   useEffect(() => {
-    loadData()
-  }, [loadData])
+    // Only load data if we're not intentionally going back to form
+    if (!isNavigatingBack) {
+      loadData()
+    }
+  }, [loadData, isNavigatingBack])
 
   useEffect(() => {
     if (JSON.stringify(reportNotes) !== JSON.stringify(notes)) {
