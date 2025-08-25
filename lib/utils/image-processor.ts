@@ -1,4 +1,5 @@
 import type { ImageData, ProcessedImage, InstallationData, Note } from "@/lib/types"
+import { getUnifiedNotes } from "@/lib/notes"
 
 // Enhanced keyword matching for different types of issues
 const ISSUE_KEYWORDS = {
@@ -397,7 +398,50 @@ export function setCaptionsFromUnitNotes(
     return images
   }
 
-  // Find the three leak columns
+  // Load CSV preview data from localStorage to get comprehensive notes
+  let selectedCells: Record<string, string[]> = {}
+  let selectedNotesColumns: string[] = []
+
+  try {
+    const storedSelectedCells = localStorage.getItem("selectedCells")
+    const storedSelectedNotesColumns = localStorage.getItem("selectedNotesColumns")
+
+    if (storedSelectedCells) {
+      selectedCells = JSON.parse(storedSelectedCells)
+      console.log("🔥 Loaded selected cells from CSV preview:", selectedCells)
+    }
+
+    if (storedSelectedNotesColumns) {
+      selectedNotesColumns = JSON.parse(storedSelectedNotesColumns)
+      console.log("🔥 Loaded selected notes columns from CSV preview:", selectedNotesColumns)
+    }
+  } catch (error) {
+    console.error("🔥 Error loading CSV preview data:", error)
+  }
+
+  // Find the unit column
+  const findUnitColumn = (data: InstallationData[]): string | null => {
+    if (!data || data.length === 0) return null
+
+    const firstItem = data[0]
+    const keys = Object.keys(firstItem)
+
+    // Look for "Unit" column first
+    if (keys.includes("Unit")) return "Unit"
+
+    // Look for any column containing "unit"
+    for (const key of keys) {
+      if (key.toLowerCase().includes("unit")) return key
+    }
+
+    // Fallback to first column
+    return keys[0]
+  }
+
+  const unitColumn = findUnitColumn(installationData)
+  console.log("🔥 Using unit column:", unitColumn)
+
+  // Find the three leak columns (for backward compatibility)
   const sampleData = installationData[0]
   const columns = Object.keys(sampleData)
 
@@ -428,8 +472,11 @@ export function setCaptionsFromUnitNotes(
   return images.map((image) => {
     console.log(`🔥 Processing image: ${image.filename} for unit ${image.unit}`)
 
-    // Find the unit's data
-    const unitData = installationData.find((data) => data.Unit === image.unit)
+    // Find the unit's data using the detected unit column
+    const unitData = installationData.find((data) => {
+      const unitValue = unitColumn ? data[unitColumn] : data.Unit
+      return unitValue === image.unit
+    })
 
     if (!unitData) {
       console.log(`🔥 Unit ${image.unit} - No unit data found`)
@@ -439,21 +486,82 @@ export function setCaptionsFromUnitNotes(
       }
     }
 
-    let caption = ""
+    // Get comprehensive notes for this unit using the unified notes system
+    let comprehensiveNotes = ""
 
+    // 1. Add leak issue notes (existing functionality)
     if (tubLeakColumn && unitData[tubLeakColumn] && unitData[tubLeakColumn].trim()) {
       const severity = unitData[tubLeakColumn].trim()
-      caption = `${severity} leak from tub spout.`
-      console.log(`🔥 Assigned tub caption: "${caption}"`)
-    } else if (kitchSinkColumn && unitData[kitchSinkColumn] && unitData[kitchSinkColumn].trim()) {
+      comprehensiveNotes += `${severity} leak from tub spout. `
+    }
+    if (kitchSinkColumn && unitData[kitchSinkColumn] && unitData[kitchSinkColumn].trim()) {
       const severity = unitData[kitchSinkColumn].trim()
-      caption = `${severity} drip from kitchen faucet.`
-      console.log(`🔥 Assigned kitchen caption: "${caption}"`)
-    } else if (bathSinkColumn && unitData[bathSinkColumn] && unitData[bathSinkColumn].trim()) {
+      comprehensiveNotes += `${severity} drip from kitchen faucet. `
+    }
+    if (bathSinkColumn && unitData[bathSinkColumn] && unitData[bathSinkColumn].trim()) {
       const severity = unitData[bathSinkColumn].trim()
-      caption = `${severity} drip from bathroom faucet.`
-      console.log(`🔥 Assigned bathroom caption: "${caption}"`)
+      comprehensiveNotes += `${severity} drip from bathroom faucet. `
+    }
+
+    // 2. Add CSV preview selected columns notes
+    if (selectedNotesColumns.length > 0) {
+      selectedNotesColumns.forEach((columnName) => {
+        if (unitData[columnName] && unitData[columnName].trim()) {
+          comprehensiveNotes += `${columnName}: ${unitData[columnName].trim()}. `
+        }
+      })
+    }
+
+    // 3. Add CSV preview selected cells notes
+    if (selectedCells[image.unit]) {
+      selectedCells[image.unit].forEach((cellNote) => {
+        comprehensiveNotes += `${cellNote}. `
+      })
+    }
+
+    // 4. Add any additional notes from the unit data
+    if (unitData.Notes && unitData.Notes.trim()) {
+      comprehensiveNotes += unitData.Notes.trim() + " "
+    }
+
+    // 5. Add notes from the notes array (if any)
+    const unitNote = notes.find((note) => note.unit === image.unit)
+    if (unitNote && unitNote.note && unitNote.note.trim()) {
+      comprehensiveNotes += unitNote.note.trim() + " "
+    }
+
+    // 6. Use the unified notes system to get the most comprehensive notes
+    try {
+      const unifiedNotes = getUnifiedNotes({
+        installationData,
+        unitColumn: unitColumn || "Unit",
+        selectedCells,
+        selectedNotesColumns,
+      })
+
+      const unitUnifiedNote = unifiedNotes.find(note => note.unit === image.unit)
+      if (unitUnifiedNote && unitUnifiedNote.note && unitUnifiedNote.note.trim()) {
+        // If unified notes has more comprehensive information, use it
+        if (unitUnifiedNote.note.length > comprehensiveNotes.length) {
+          comprehensiveNotes = unitUnifiedNote.note.trim()
+          console.log(`🔥 Using unified notes for caption: "${comprehensiveNotes}"`)
+        }
+      }
+    } catch (error) {
+      console.error("🔥 Error getting unified notes:", error)
+    }
+
+    // Clean up the comprehensive notes
+    comprehensiveNotes = comprehensiveNotes.trim()
+
+    let caption = ""
+
+    if (comprehensiveNotes && comprehensiveNotes !== "") {
+      // Use the comprehensive notes as the caption
+      caption = comprehensiveNotes
+      console.log(`🔥 Generated comprehensive caption: "${caption}"`)
     } else {
+      // Fallback to basic caption
       caption = image.caption || `Unit ${image.unit} installation photo`
       console.log(`🔥 Using fallback caption: "${caption}"`)
     }
