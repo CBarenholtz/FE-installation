@@ -37,8 +37,8 @@
     "@radix-ui/react-toggle": "latest",
     "@radix-ui/react-toggle-group": "latest",
     "@radix-ui/react-tooltip": "latest",
-    "@supabase/supabase-js": "^2.45.4",
     "@supabase/auth-helpers-nextjs": "^0.8.7",
+    "@supabase/supabase-js": "^2.45.4",
     "@types/jszip": "^3.4.1",
     "@vercel/blob": "^0.27.3",
     "autoprefixer": "^10.4.20",
@@ -68,10 +68,10 @@
   },
   "devDependencies": {
     "@types/node": "^22",
-    "@types/react": "^19",
+    "@types/react": "19.1.11",
     "@types/react-dom": "^19",
     "postcss": "^8.5",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5"
+    "typescript": "5.9.2"
   }
 }

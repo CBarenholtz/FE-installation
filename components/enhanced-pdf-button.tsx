@@ -7,7 +7,7 @@ import type { CustomerInfo, InstallationData, Note } from "@/lib/types"
 import { useReportContext } from "@/lib/report-context"
 // Import the formatNote function
 import { formatNote } from "@/lib/utils/aerator-helpers"
-import { getStoredNotes, getFinalNoteForUnit } from "@/lib/notes"
+import { getStoredNotes, getFinalNoteForUnit, getUnifiedNotes } from "@/lib/notes"
 
 interface EnhancedPdfButtonProps {
   customerInfo: CustomerInfo
@@ -213,6 +213,41 @@ export default function EnhancedPdfButton({
     }
 
     return { installed: false, columnName: null }
+  }
+
+  // Use the same unified notes system as the Details page
+  const getNotesForUnit = (unitValue: string, unitColumn: string | null): string => {
+    try {
+      // Load selected cells and columns from localStorage (from CSV preview)
+      let selectedCells: Record<string, string[]> = {}
+      let selectedNotesColumns: string[] = []
+
+      const storedSelectedCells = localStorage.getItem("selectedCells")
+      const storedSelectedNotesColumns = localStorage.getItem("selectedNotesColumns")
+
+      if (storedSelectedCells) {
+        selectedCells = JSON.parse(storedSelectedCells)
+      }
+
+      if (storedSelectedNotesColumns) {
+        selectedNotesColumns = JSON.parse(storedSelectedNotesColumns)
+      }
+
+      // Use unified notes system to get notes for this unit
+      const unifiedNotes = getUnifiedNotes({
+        installationData,
+        unitColumn: unitColumn || "Unit",
+        selectedCells,
+        selectedNotesColumns,
+      })
+
+      // Find the note for this specific unit
+      const unitNote = unifiedNotes.find(note => note.unit === unitValue)
+      return unitNote ? unitNote.note : ""
+    } catch (error) {
+      console.error("Error getting unified notes for unit:", unitValue, error)
+      return ""
+    }
   }
 
   // Replace the hasToiletInstalled function with this
@@ -496,15 +531,11 @@ export default function EnhancedPdfButton({
           consolidatedData[unitKey].toiletQuantity = toiletQuantity
         }
 
-        // Collect notes
-        const unitNotes = []
-        if (item["Leak Issue Kitchen Faucet"]) unitNotes.push("Kitchen faucet leak")
-        if (item["Leak Issue Bath Faucet"]) unitNotes.push("Bathroom faucet leak")
-        if (item["Tub Spout/Diverter Leak Issue"])
-          unitNotes.push(`${item["Tub Spout/Diverter Leak Issue"]} leak from tub`)
-        if (item.Notes) unitNotes.push(item.Notes)
-
-        consolidatedData[unitKey].notes.push(...unitNotes)
+        // Get notes using the unified notes system (same as Details page)
+        const unitNotes = getNotesForUnit(unitKey, unitColumn)
+        if (unitNotes && unitNotes.trim()) {
+          consolidatedData[unitKey].notes.push(unitNotes.trim())
+        }
       }
 
       console.log("Using context values:", {
@@ -1350,83 +1381,9 @@ export default function EnhancedPdfButton({
                 ? `0.8 GPF (${consolidated.toiletQuantity})`
                 : ""
 
-          // Update the notes compilation in the PDF generation
-          // Compile notes with proper sentence case - only include leak issues
-          let noteText = ""
-
-          // Handle kitchen faucet leaks with severity
-          if (item["Leak Issue Kitchen Faucet"]) {
-            const leakValue = item["Leak Issue Kitchen Faucet"].trim()
-            const lowerLeakValue = leakValue.toLowerCase()
-
-            if (lowerLeakValue === "light") {
-              noteText += "Light leak from kitchen faucet. "
-            } else if (lowerLeakValue === "moderate") {
-              noteText += "Moderate leak from kitchen faucet. "
-            } else if (lowerLeakValue === "heavy") {
-              noteText += "Heavy leak from kitchen faucet. "
-            } else if (lowerLeakValue === "dripping" || lowerLeakValue === "driping") {
-              noteText += "Dripping from kitchen faucet. "
-            } else {
-              // For any other non-empty value, show "leak from kitchen faucet"
-              noteText += "Leak from kitchen faucet. "
-            }
-          }
-
-          // Handle bathroom faucet leaks with severity
-          if (item["Leak Issue Bath Faucet"]) {
-            const leakValue = item["Leak Issue Bath Faucet"].trim()
-            const lowerLeakValue = leakValue.toLowerCase()
-
-            if (lowerLeakValue === "light") {
-              noteText += "Light leak from bathroom faucet. "
-            } else if (lowerLeakValue === "moderate") {
-              noteText += "Moderate leak from bathroom faucet. "
-            } else if (lowerLeakValue === "heavy") {
-              noteText += "Heavy leak from bathroom faucet. "
-            } else if (lowerLeakValue === "dripping" || lowerLeakValue === "driping") {
-              noteText += "Dripping from bathroom faucet. "
-            } else {
-              // For any other non-empty value, show "leak from bathroom faucet"
-              noteText += "Leak from bathroom faucet. "
-            }
-          }
-
-          // Handle tub spout/diverter leaks with severity
-          if (item["Tub Spout/Diverter Leak Issue"]) {
-            const leakValue = item["Tub Spout/Diverter Leak Issue"]
-            if (leakValue === "Light") {
-              noteText += "Light leak from tub spout/diverter. "
-            } else if (leakValue === "Moderate") {
-              noteText += "Moderate leak from tub spout/diverter. "
-            } else if (leakValue === "Heavy") {
-              noteText += "Heavy leak from tub spout/diverter. "
-            } else {
-              // For any other value, just write "leak from tub spout/diverter"
-              noteText += "Leak from tub spout/diverter. "
-            }
-          }
-
-          // Check if all installation columns are blank
-          const isUnitNotAccessed =
-            (!kitchenAeratorColumn || item[kitchenAeratorColumn] === "" || item[kitchenAeratorColumn] === undefined) &&
-            (!bathroomAeratorColumn ||
-              item[bathroomAeratorColumn] === "" ||
-              item[bathroomAeratorColumn] === undefined) &&
-            (!showerHeadColumn || item[showerHeadColumn] === "" || item[showerHeadColumn] === undefined) &&
-            !hasToiletInstalled(item)
-
-          // If unit not accessed and no other notes, add that information
-          if (isUnitNotAccessed && !noteText) {
-            noteText = "Unit not accessed."
-          }
-
-          // Format the notes with proper sentence case
-          noteText = formatNote(noteText)
-
-          // Use unified notes system
+          // Use the same unified notes system as the Details page
           const unitValue = unitColumn ? item[unitColumn] : item.Unit
-          const finalNoteText = getFinalNoteForUnit(unitValue || "", noteText)
+          const finalNoteText = getNotesForUnit(unitValue || "", unitColumn)
 
           // Calculate how many lines the note will take
           let noteLines: string[] = []

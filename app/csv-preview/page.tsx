@@ -169,7 +169,7 @@ export default function CsvPreviewPage() {
 
     setSelectedCells((prev) => {
       const unitCells = prev[unitValue] || []
-      const cellIdentifier = `${value}` // Removed column name
+      const cellIdentifier = `${getProperCase(column)}: ${value}`
 
       const isSelected = unitCells.includes(cellIdentifier)
 
@@ -406,28 +406,73 @@ export default function CsvPreviewPage() {
             <CardTitle>Additional Notes Columns</CardTitle>
           </CardHeader>
           <CardContent>
-            <Label>Select columns to include in notes:</Label>
+            <Label>Select columns to include ALL values in notes (optional):</Label>
+            <p className="text-xs text-muted-foreground mb-2">
+              Check columns below if you want ALL values from that column included in notes for every unit.
+              Some columns are auto-selected. You can also add individual cells by clicking on them in the preview.
+            </p>
+            
+            {/* Auto-selected columns summary */}
+            {(() => {
+              const autoSelectedCols = selectedNotesColumns.filter(col => 
+                ["Tub Leak Description", "Kitch Sink", "Bath Sink"].some(target => 
+                  col.toLowerCase().includes(target.toLowerCase()) || 
+                  target.toLowerCase().includes(col.toLowerCase())
+                )
+              )
+              
+              if (autoSelectedCols.length > 0) {
+                return (
+                  <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded">
+                    <p className="text-xs font-medium text-green-800 mb-1">
+                      🎯 Auto-selected columns (all values included):
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {autoSelectedCols.map(col => (
+                        <span key={col} className="text-xs bg-green-600 text-white px-2 py-1 rounded">
+                          {getProperCase(col)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )
+              }
+              return null
+            })()}
             <div className="space-y-2 max-h-40 overflow-y-auto">
               {availableColumns
                 .filter((col) => col !== selectedUnitColumn)
-                .map((column) => (
-                  <div key={column} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`notes-${column}`}
-                      checked={selectedNotesColumns.includes(column)}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedNotesColumns((prev) => [...prev, column])
-                        } else {
-                          setSelectedNotesColumns((prev) => prev.filter((col) => col !== column))
-                        }
-                      }}
-                    />
-                    <Label htmlFor={`notes-${column}`} className="text-sm">
-                      {getProperCase(column)}
-                    </Label>
-                  </div>
-                ))}
+                .map((column) => {
+                  const isAutoSelected = selectedNotesColumns.includes(column) && 
+                    ["Tub Leak Description", "Kitch Sink", "Bath Sink"].some(target => 
+                      column.toLowerCase().includes(target.toLowerCase()) || 
+                      target.toLowerCase().includes(column.toLowerCase())
+                    )
+                  
+                  return (
+                    <div key={column} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`notes-${column}`}
+                        checked={selectedNotesColumns.includes(column)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedNotesColumns((prev) => [...prev, column])
+                          } else {
+                            setSelectedNotesColumns((prev) => prev.filter((col) => col !== column))
+                          }
+                        }}
+                      />
+                      <Label htmlFor={`notes-${column}`} className="text-sm flex items-center gap-2">
+                        {getProperCase(column)}
+                        {isAutoSelected && (
+                          <span className="text-xs bg-green-600 text-white px-1.5 py-0.5 rounded-full">
+                            Auto
+                          </span>
+                        )}
+                      </Label>
+                    </div>
+                  )
+                })}
             </div>
           </CardContent>
         </Card>
@@ -438,9 +483,9 @@ export default function CsvPreviewPage() {
             <CardTitle>Selected Cells</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground mb-2">
-              Click on cells in the preview to add them to notes for specific units.
-            </p>
+                      <p className="text-sm text-muted-foreground mb-2">
+            Click on cells in the preview to add them to notes for specific units. Auto-selected columns and individual cells are both included.
+          </p>
             <div className="space-y-2 max-h-40 overflow-y-auto">
               {Object.entries(selectedCells).map(([unit, cells]) => (
                 <div key={unit} className="text-sm">
@@ -465,7 +510,7 @@ export default function CsvPreviewPage() {
         <CardHeader>
           <CardTitle>Data Preview ({previewData.length} rows)</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Click on cells to add them to notes for specific units. The selected unit column is highlighted.
+            Click on cells to add them to notes for specific units. Auto-selected columns and individual cells are both included in the final report. The selected unit column is highlighted.
           </p>
         </CardHeader>
         <CardContent>
@@ -473,16 +518,37 @@ export default function CsvPreviewPage() {
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-white">
                 <tr>
-                  {availableColumns.map((column) => (
-                    <th
-                      key={column}
-                      className={`text-left p-2 border-b font-medium ${
-                        column === selectedUnitColumn ? "bg-blue-100" : ""
-                      }`}
-                    >
-                      {getProperCase(column)}
-                    </th>
-                  ))}
+                  {availableColumns.map((column) => {
+                    const isUnitColumn = column === selectedUnitColumn
+                    const isAutoSelected = selectedNotesColumns.includes(column)
+                    
+                    return (
+                      <th
+                        key={column}
+                        className={`text-left p-2 border-b font-medium ${
+                          isUnitColumn ? "bg-blue-100" : ""
+                        } ${
+                          isAutoSelected ? "bg-green-100 border-l-4 border-l-green-500" : ""
+                        }`}
+                        title={
+                          isAutoSelected 
+                            ? "Auto-selected column - all values will be included in notes" 
+                            : isUnitColumn 
+                              ? "Unit identifier column" 
+                              : "Click cells to add to notes"
+                        }
+                      >
+                        <div className="flex items-center gap-2">
+                          {getProperCase(column)}
+                          {isAutoSelected && (
+                            <span className="text-xs bg-green-600 text-white px-1 py-0.5 rounded">
+                              Auto
+                            </span>
+                          )}
+                        </div>
+                      </th>
+                    )
+                  })}
                 </tr>
               </thead>
               <tbody>

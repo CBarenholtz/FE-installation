@@ -287,15 +287,15 @@ function UploadForm() {
         reader.onload = (e) => {
           const imageData = e.target?.result as string
           localStorage.setItem("coverImage", imageData)
-          console.log("[v0] Cover image saved, navigating to report view...")
-          // Navigate to report view instead of reloading
-          router.push("/report")
+          console.log("[v0] Cover image saved, navigating to CSV preview...")
+          // Navigate to CSV preview instead of report view
+          router.push("/csv-preview")
         }
         reader.readAsDataURL(coverImage)
       } else {
-        console.log("[v0] No cover image, navigating to report view...")
-        // Navigate to report view instead of reloading
-        router.push("/report")
+        console.log("[v0] No cover image, navigating to CSV preview...")
+        // Navigate to CSV preview instead of report view
+        router.push("/csv-preview")
       }
     } catch (error) {
       console.error("Error processing file:", error)
@@ -312,6 +312,25 @@ function UploadForm() {
         <CardContent className="pt-6">
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-2xl font-bold">Water Installation Report Generator</h1>
+            {(() => {
+              try {
+                const hasData = localStorage.getItem("rawInstallationData") && localStorage.getItem("customerInfo")
+                if (hasData) {
+                  return (
+                    <Button 
+                      variant="outline" 
+                      onClick={() => router.push("/csv-preview")}
+                      size="sm"
+                    >
+                      📊 Data Preview
+                    </Button>
+                  )
+                }
+                return null
+              } catch (error) {
+                return null
+              }
+            })()}
           </div>
 
           {processedData && (
@@ -433,6 +452,32 @@ function UploadForm() {
               )}
             </Button>
           </form>
+          
+          {/* CSV Preview Button - only show if there's data in localStorage */}
+          {(() => {
+            try {
+              const hasData = localStorage.getItem("rawInstallationData") && localStorage.getItem("customerInfo")
+              if (hasData) {
+                return (
+                  <div className="mt-4 text-center">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => router.push("/csv-preview")}
+                      className="w-full"
+                    >
+                      📊 Review & Configure Data
+                    </Button>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Review uploaded data and configure how it should be processed
+                    </p>
+                  </div>
+                )
+              }
+              return null
+            } catch (error) {
+              return null
+            }
+          })()}
         </CardContent>
       </Card>
     </div>

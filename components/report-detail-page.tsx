@@ -5,7 +5,7 @@ import { getAeratorDescription, formatNote } from "@/lib/utils/aerator-helpers"
 import { useReportContext } from "@/lib/report-context"
 import { Button } from "@/components/ui/button"
 import { Plus, Trash2 } from "lucide-react"
-import { updateStoredNote, getStoredNotes } from "@/lib/notes"
+import { updateStoredNote, getStoredNotes, getUnifiedNotes } from "@/lib/notes"
 
 interface InstallationData {
   Unit: string
@@ -143,20 +143,39 @@ export default function ReportDetailPage({
     return getToiletColumnInfo(item).installed
   }
 
-  const compileNotesForUnit = (item: InstallationData, includeNotAccessed = true): string => {
-    let notes = ""
+  // Use the same unified notes system as the Notes page
+  const getNotesForUnit = (unitValue: string): string => {
+    try {
+      // Load selected cells and columns from localStorage (from CSV preview)
+      let selectedCells: Record<string, string[]> = {}
+      let selectedNotesColumns: string[] = []
 
-    if (item["Leak Issue Kitchen Faucet"]) notes += "Dripping from kitchen faucet. "
-    if (item["Leak Issue Bath Faucet"]) notes += "Dripping from bathroom faucet. "
-    if (item["Tub Spout/Diverter Leak Issue"] === "Light") notes += "Light leak from tub spout/ diverter. "
-    if (item["Tub Spout/Diverter Leak Issue"] === "Moderate") notes += "Moderate leak from tub spout/diverter. "
-    if (item["Tub Spout/Diverter Leak Issue"] === "Heavy") notes += "Heavy leak from tub spout/ diverter. "
+      const storedSelectedCells = localStorage.getItem("selectedCells")
+      const storedSelectedNotesColumns = localStorage.getItem("selectedNotesColumns")
 
-    //if (item.Notes && item.Notes.trim() !== "") {
-      //notes += item.Notes + " "
-    //}
+      if (storedSelectedCells) {
+        selectedCells = JSON.parse(storedSelectedCells)
+      }
 
-    return formatNote(notes.trim())
+      if (storedSelectedNotesColumns) {
+        selectedNotesColumns = JSON.parse(storedSelectedNotesColumns)
+      }
+
+      // Use unified notes system to get notes for this unit
+      const unifiedNotes = getUnifiedNotes({
+        installationData,
+        unitColumn: unitColumn || "Unit",
+        selectedCells,
+        selectedNotesColumns,
+      })
+
+      // Find the note for this specific unit
+      const unitNote = unifiedNotes.find(note => note.unit === unitValue)
+      return unitNote ? unitNote.note : ""
+    } catch (error) {
+      console.error("Error getting unified notes for unit:", unitValue, error)
+      return ""
+    }
   }
 
   const unitColumn = findUnitColumn(installationData)
@@ -309,10 +328,10 @@ export default function ReportDetailPage({
         console.log(`Toilet quantity for ${unitKey}: ${toiletQuantity}`)
       }
 
-      // Collect notes
-      const compiledNotes = compileNotesForUnit(item, true)
-      if (compiledNotes && compiledNotes.trim()) {
-        consolidatedData[unitKey].notes.push(compiledNotes.trim())
+      // Get notes using the unified notes system (same as Notes page)
+      const unitNotes = getNotesForUnit(unitKey)
+      if (unitNotes && unitNotes.trim()) {
+        consolidatedData[unitKey].notes.push(unitNotes.trim())
       }
     }
 
@@ -353,6 +372,39 @@ export default function ReportDetailPage({
   const hasShowers = filteredData.some((item) => item._showerADAQuantity > 0 || item._showerRegularQuantity > 0)
   const hasToilets = filteredData.some((item) => item._toiletQuantity > 0)
   const hasNotes = true
+
+  // Load CSV preview data from localStorage and listen for unified notes updates
+  useEffect(() => {
+    try {
+      // Load selected cells from CSV preview
+      const selectedCellsData = localStorage.getItem("selectedCells")
+      if (selectedCellsData) {
+        const selectedCells = JSON.parse(selectedCellsData)
+        console.log("Details: Loaded CSV preview selected cells:", selectedCells)
+      }
+      
+      // Load selected notes columns from CSV preview
+      const selectedNotesColumnsData = localStorage.getItem("selectedNotesColumns")
+      if (selectedNotesColumnsData) {
+        const selectedNotesColumns = JSON.parse(selectedNotesColumnsData)
+        console.log("Details: Loaded CSV preview selected columns:", selectedNotesColumns)
+      }
+    } catch (error) {
+      console.error("Details: Error loading CSV preview data:", error)
+    }
+  }, [])
+
+  // Listen for unified notes updates (same as Notes page)
+  useEffect(() => {
+    const handleNotesUpdate = () => {
+      console.log("Details: Received unified notes update event")
+      // Force re-render when unified notes are updated
+      setEditedNotes({ ...editedNotes })
+    }
+
+    window.addEventListener("unifiedNotesUpdated", handleNotesUpdate)
+    return () => window.removeEventListener("unifiedNotesUpdated", handleNotesUpdate)
+  }, [editedNotes])
 
   // Event handlers
   const handleNoteEdit = (unit: string, value: string) => {
@@ -687,7 +739,7 @@ export default function ReportDetailPage({
                             value={
                               editedNotes[unitValue ?? ""] !== undefined
                                 ? editedNotes[unitValue ?? ""]
-                                : item._consolidatedNotes
+                                : getNotesForUnit(unitValue ?? "")
                             }
                             onChange={(value) => handleNoteEdit(unitValue ?? "", value)}
                             placeholder="Notes"
@@ -695,7 +747,12 @@ export default function ReportDetailPage({
                         ) : editedNotes[unitValue ?? ""] !== undefined ? (
                           editedNotes[unitValue ?? ""]
                         ) : (
-                          item._consolidatedNotes
+                          <div>
+                            {getNotesForUnit(unitValue ?? "")}
+                            <div className="text-xs text-green-600 mt-1">
+                              📊 Unified notes system (same as Notes page)
+                            </div>
+                          </div>
                         )}
                       </td>
                     )}
@@ -805,7 +862,14 @@ export default function ReportDetailPage({
                       <td className="py-2 px-2 border-b">
                         {editedNotes[item.Unit ?? ""] !== undefined
                           ? editedNotes[item.Unit ?? ""]
-                          : item._consolidatedNotes}
+                          : (
+                            <div>
+                              {getNotesForUnit(item.Unit ?? "")}
+                              <div className="text-xs text-green-600 mt-1">
+                                📊 Unified notes system (same as Notes page)
+                              </div>
+                            </div>
+                          )}
                       </td>
                     )}
                   </tr>
