@@ -178,7 +178,7 @@ function UploadForm() {
              const toiletCount = installationData.reduce((total, item) => {
          // First, try to find "Toilets Installed:" columns (these are the primary source)
          const toiletsInstalledColumns = Object.keys(item).filter(key => 
-           key.startsWith("Toilets Installed:") || key.startsWith("toilets installed:") || key.startsWith("toilets replaced:")|| key.startsWith("Toilets Replaced:")
+           key.startsWith("Toilets Installed") || key.startsWith("toilets installed") || key.startsWith("toilets replaced")|| key.startsWith("Toilets Replaced")
          )
          
          let toiletQty = 0
