@@ -516,12 +516,16 @@ export default function EnhancedPdfButton({
         consolidatedData[unitKey].bathroomQuantity = bathroomCount
 
         // Shower: Read actual quantities from both columns
-        if (specificColumns.adaShowerHead && item[specificColumns.adaShowerHead]) {
-          const adaQuantity = Number.parseInt(String(item[specificColumns.adaShowerHead])) || 0
+        // ADA Shower Head: Only use value from ADA column
+        if (specificColumns.adaShowerHead) {
+          const adaValue = item[specificColumns.adaShowerHead]
+          const adaQuantity = adaValue && adaValue !== '' && adaValue !== '0' ? Number.parseInt(String(adaValue)) || 0 : 0
           consolidatedData[unitKey].showerADAQuantity = adaQuantity
         }
-        if (specificColumns.regularShowerHead && item[specificColumns.regularShowerHead]) {
-          const regularQuantity = Number.parseInt(String(item[specificColumns.regularShowerHead])) || 0
+        // Regular Shower Head: Only use value from regular column
+        if (specificColumns.regularShowerHead) {
+          const regularValue = item[specificColumns.regularShowerHead]
+          const regularQuantity = regularValue && regularValue !== '' && regularValue !== '0' ? Number.parseInt(String(regularValue)) || 0 : 0
           consolidatedData[unitKey].showerRegularQuantity = regularQuantity
         }
 
@@ -1370,7 +1374,7 @@ export default function EnhancedPdfButton({
               parts.push(`1.5 GPM (${consolidated.showerADAQuantity})`)
             }
 
-            return parts.length > 0 ? parts.join("; ") : "No Touch."
+            return parts.length > 0 ? parts.join("\n") : "No Touch."
           })()
 
           // Toilet display using consolidated data
@@ -1423,74 +1427,100 @@ export default function EnhancedPdfButton({
           }
 
           // Write data to PDF
-          doc.setFontSize(9)
+doc.setFontSize(9)
 
-          colIndex = 0
+colIndex = 0
 
-          // Wrap unit text if it's too long
-          unitLinesForHeight.forEach((line: string, lineIndex: number) => {
-            doc.text(line, columnPositions[colIndex], yPos + lineIndex * 3)
-          })
-          colIndex++
+// Wrap unit text if it's too long - FIXED VERSION
+const unitLines = doc.splitTextToSize(displayUnit, columnWidths[colIndex] - 2)
+// Calculate the actual width the text will occupy
+const maxUnitLineWidth = Math.max(...unitLines.map(line => doc.getTextWidth(line)))
 
-          if (hasKitchenAerators) {
-            const kitchenText = kitchenAerator === "No Touch." ? "—" : kitchenAerator
-            // Center the dash, left-align other text
-            if (kitchenText === "—") {
-              // Simple dash
-              doc.text("\t—\t", columnPositions[colIndex], yPos)
-            } else {
-              doc.text(kitchenText, columnPositions[colIndex], yPos)
-            }
-            colIndex++
-          }
-          if (hasBathroomAerators) {
-            const bathroomText = bathroomAerator === "No Touch." ? "—" : bathroomAerator
-            if (bathroomText === "—") {
-              doc.text("\t—\t", columnPositions[colIndex], yPos)
-            } else {
-              doc.text(bathroomText, columnPositions[colIndex], yPos)
-            }
-            colIndex++
-          }
-          if (hasShowers) {
-            const showerText = showerHead === "No Touch." ? "—" : showerHead
-            if (showerText === "—") {
-              doc.text("\t—\t", columnPositions[colIndex], yPos)
-            } else {
-              const showerLines = doc.splitTextToSize(showerText, columnWidths[colIndex] - 2)
-              showerLines.forEach((line: string, lineIndex: number) => {
-                doc.text(line, columnPositions[colIndex], yPos + lineIndex * 3)
-              })
-            }
-            colIndex++
-          }
-          if (hasToilets) {
-            const toiletText = toilet ? toilet : "—"
-            if (toiletText === "—") {
-              doc.text("\t—\t", columnPositions[colIndex], yPos)
-            } else {
-              doc.text(toiletText, columnPositions[colIndex], yPos)
-            }
-            colIndex++
-          }
+// If text is still too wide, force wrap at character level
+const finalUnitLines = []
+for (const line of unitLines) {
+  if (doc.getTextWidth(line) > columnWidths[colIndex] - 2) {
+    // Split long words character by character if needed
+    let currentLine = ""
+    for (const char of line) {
+      if (doc.getTextWidth(currentLine + char) > columnWidths[colIndex] - 2) {
+        if (currentLine) finalUnitLines.push(currentLine)
+        currentLine = char
+      } else {
+        currentLine += char
+      }
+    }
+    if (currentLine) finalUnitLines.push(currentLine)
+  } else {
+    finalUnitLines.push(line)
+  }
+}
 
-          // Handle notes with wrapping if needed
-          if (hasNotes) {
-            doc.setFontSize(10) // Ensure consistent font size for notes
-            // Write each line, incrementing the y-position for each additional line
-            noteLines.forEach((line, lineIndex) => {
-              if (lineIndex === 0) {
-                doc.text(line, columnPositions[colIndex], yPos)
-              } else {
-                yPos += 5
-                doc.text(line, columnPositions[colIndex], yPos)
-              }
-            })
-          }
+finalUnitLines.forEach((line: string, lineIndex: number) => {
+  doc.text(line, columnPositions[colIndex], yPos + lineIndex * 3)
+})
+colIndex++
 
-          // Increment y position based on the row height
-          yPos = rowStartY + rowHeight + 5
+// Keep track of the base Y position for this row
+const baseYPos = yPos
+
+if (hasKitchenAerators) {
+  const kitchenText = kitchenAerator === "No Touch." ? "—" : kitchenAerator
+  // Center the dash, left-align other text
+  if (kitchenText === "—") {
+    // Simple dash
+    doc.text("\t—\t", columnPositions[colIndex], baseYPos)
+  } else {
+    doc.text(kitchenText, columnPositions[colIndex], baseYPos)
+  }
+  colIndex++
+}
+
+if (hasBathroomAerators) {
+  const bathroomText = bathroomAerator === "No Touch." ? "—" : bathroomAerator
+  if (bathroomText === "—") {
+    doc.text("\t—\t", columnPositions[colIndex], baseYPos)
+  } else {
+    doc.text(bathroomText, columnPositions[colIndex], baseYPos)
+  }
+  colIndex++
+}
+
+if (hasShowers) {
+  const showerText = showerHead === "No Touch." ? "—" : showerHead
+  if (showerText === "—") {
+    doc.text("\t—\t", columnPositions[colIndex], baseYPos)
+  } else {
+    const showerLines = doc.splitTextToSize(showerText, columnWidths[colIndex] - 2)
+    showerLines.forEach((line: string, lineIndex: number) => {
+      doc.text(line, columnPositions[colIndex], baseYPos + lineIndex * 3)
+    })
+  }
+  colIndex++
+}
+
+if (hasToilets) {
+  const toiletText = toilet ? toilet : "—"
+  if (toiletText === "—") {
+    doc.text("\t—\t", columnPositions[colIndex], baseYPos)
+  } else {
+    doc.text(toiletText, columnPositions[colIndex], baseYPos)
+  }
+  colIndex++
+}
+
+// Handle notes with wrapping if needed - FIXED VERSION
+if (hasNotes) {
+  doc.setFontSize(10) // Ensure consistent font size for notes
+  // Use the base Y position instead of the modified yPos
+  noteLines.forEach((line, lineIndex) => {
+    doc.text(line, columnPositions[colIndex], baseYPos + lineIndex * 5)
+  })
+}
+
+// The key fix: Don't modify yPos during text rendering within the row
+// Only update yPos at the end based on the calculated rowHeight
+yPos = rowStartY + rowHeight + 5
           currentDataIndex++
           rowCount++
 
@@ -1643,7 +1673,7 @@ export default function EnhancedPdfButton({
               doc.text(`Unit ${image.unit}`, x, y + maxImageHeight + 5)
               doc.setFont("helvetica", "normal")
               doc.setFontSize(8)
-              const captionLines = doc.splitTextToSize(image.caption || image.filename, maxImageWidth)
+              const captionLines = doc.splitTextToSize(image.caption || "", maxImageWidth)
               captionLines.forEach((line: string, lineIndex: number) => {
                 doc.text(line, x, y + maxImageHeight + 10 + lineIndex * 3)
               })

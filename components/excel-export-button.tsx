@@ -302,7 +302,7 @@ export default function ExcelExportButton({
             parts.push(`1.5 GPM (${consolidated.showerADAQuantity})`)
           }
 
-          return parts.length > 0 ? parts.join("; ") : "No Touch."
+          return parts.length > 0 ? parts.join("\n") : "No Touch."
         })()
 
         const toiletDisplay =

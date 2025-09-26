@@ -1,7 +1,9 @@
+
 import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
+import { PersistentHeader } from "../components/persistent-header";
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -28,7 +30,10 @@ export default function RootLayout({
           `}
         </style>
       </head>
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        <PersistentHeader />
+        <div style={{ paddingTop: '70px' }}>{children}</div>
+      </body>
     </html>
   )
 }

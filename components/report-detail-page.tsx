@@ -210,51 +210,48 @@ export default function ReportDetailPage({
 
     // Helper function to find specific quantity columns
     const findSpecificColumns = () => {
-      if (!result.length) return {}
-
-      const firstItem = result[0]
-      const keys = Object.keys(firstItem)
-
-      const columns = {
-        // Kitchen aerator column (for type, quantity always 1 if exists)
+      if (!result.length) return {};
+      const firstItem = result[0];
+      const keys = Object.keys(firstItem);
+      const columns: {
+        kitchenAerator?: string;
+        bathroomAeratorGuest?: string;
+        bathroomAeratorMaster?: string;
+        adaShowerHead?: string;
+        regularShowerHead?: string;
+        toiletInstalled?: string;
+      } = {
         kitchenAerator: keys.find((key) => {
-          const lowerKey = key.toLowerCase()
-          return lowerKey.includes("kitchen") && lowerKey.includes("aerator")
+          const lowerKey = key.toLowerCase();
+          return lowerKey.includes("kitchen") && lowerKey.includes("aerator");
         }),
-
-        // Bathroom aerator columns (count both guest and master)
         bathroomAeratorGuest: keys.find((key) => {
-          const lowerKey = key.toLowerCase()
-          return lowerKey.includes("bathroom") && lowerKey.includes("aerator") && lowerKey.includes("guest")
+          const lowerKey = key.toLowerCase();
+          return lowerKey.includes("bathroom") && lowerKey.includes("aerator") && lowerKey.includes("guest");
         }),
         bathroomAeratorMaster: keys.find((key) => {
-          const lowerKey = key.toLowerCase()
-          return lowerKey.includes("bathroom") && lowerKey.includes("aerator") && lowerKey.includes("master")
+          const lowerKey = key.toLowerCase();
+          return lowerKey.includes("bathroom") && lowerKey.includes("aerator") && lowerKey.includes("master");
         }),
-
-        // Shower columns (read actual quantities)
         adaShowerHead: keys.find((key) => {
-          const lowerKey = key.toLowerCase()
-          return lowerKey.includes("ada") && lowerKey.includes("shower")
+          const lowerKey = key.toLowerCase();
+          return lowerKey.includes("ada") && lowerKey.includes("shower");
         }),
         regularShowerHead: keys.find((key) => {
-          const lowerKey = key.toLowerCase()
+          const lowerKey = key.toLowerCase();
           return (
             lowerKey.includes("shower") &&
             (lowerKey.includes("head") || lowerKey === "showerhead") &&
             !lowerKey.includes("ada")
-          )
+          );
         }),
-
-        // Toilet installation column (read direct quantity)
         toiletInstalled: keys.find((key) => {
-          const lowerKey = key.toLowerCase()
-          return lowerKey.includes("toilet") && lowerKey.includes("install")
+          const lowerKey = key.toLowerCase();
+          return lowerKey.includes("toilet") && lowerKey.includes("install");
         }),
-      }
-
-      console.log("Found specific columns:", columns)
-      return columns
+      };
+      console.log("Found specific columns:", columns);
+      return columns;
     }
 
     const specificColumns = findSpecificColumns()
@@ -310,22 +307,31 @@ export default function ReportDetailPage({
       consolidatedData[unitKey].bathroomQuantity = bathroomCount
 
       // Shower: Read actual quantities from both columns
-      if (specificColumns.adaShowerHead && item[specificColumns.adaShowerHead]) {
-        const adaQuantity = Number.parseInt(String(item[specificColumns.adaShowerHead])) || 0
-        consolidatedData[unitKey].showerADAQuantity = adaQuantity
-        console.log(`ADA Shower quantity for ${unitKey}: ${adaQuantity}`)
+      // Only use the value from the correct cell for each type
+      if (specificColumns.adaShowerHead) {
+        const adaValue = item[specificColumns.adaShowerHead];
+        const adaQuantity = adaValue && adaValue !== '' ? Number.parseInt(String(adaValue as string)) || 0 : 0;
+        consolidatedData[unitKey].showerADAQuantity = adaQuantity;
+        console.log(`ADA Shower quantity for ${unitKey}: ${adaQuantity}`);
+      } else {
+        consolidatedData[unitKey].showerADAQuantity = 0;
       }
-      if (specificColumns.regularShowerHead && item[specificColumns.regularShowerHead]) {
-        const regularQuantity = Number.parseInt(String(item[specificColumns.regularShowerHead])) || 0
-        consolidatedData[unitKey].showerRegularQuantity = regularQuantity
-        console.log(`Regular Shower quantity for ${unitKey}: ${regularQuantity}`)
+      if (specificColumns.regularShowerHead) {
+        const regularValue = item[specificColumns.regularShowerHead];
+        const regularQuantity = regularValue && regularValue !== '' ? Number.parseInt(String(regularValue as string)) || 0 : 0;
+        consolidatedData[unitKey].showerRegularQuantity = regularQuantity;
+        console.log(`Regular Shower quantity for ${unitKey}: ${regularQuantity}`);
+      } else {
+        consolidatedData[unitKey].showerRegularQuantity = 0;
       }
 
       // Toilet: Read direct quantity from toilets installed column
       if (specificColumns.toiletInstalled && item[specificColumns.toiletInstalled]) {
-        const toiletQuantity = Number.parseInt(String(item[specificColumns.toiletInstalled])) || 0
-        consolidatedData[unitKey].toiletQuantity = toiletQuantity
-        console.log(`Toilet quantity for ${unitKey}: ${toiletQuantity}`)
+        const toiletQuantity = Number.parseInt(String(item[specificColumns.toiletInstalled] as string)) || 0;
+        consolidatedData[unitKey].toiletQuantity = toiletQuantity;
+        console.log(`Toilet quantity for ${unitKey}: ${toiletQuantity}`);
+      } else {
+        consolidatedData[unitKey].toiletQuantity = 0;
       }
 
       // Get notes using the unified notes system (same as Notes page)
@@ -338,18 +344,16 @@ export default function ReportDetailPage({
     // Convert back to array format with new quantity data
     const consolidatedResult = Object.values(consolidatedData).map((unitData) => {
       // Create a new item with quantity information
-      const consolidatedItem = { ...unitData.originalItem }
-
-      // Store quantities in the item for later use
-      consolidatedItem._kitchenQuantity = unitData.kitchenQuantity
-      consolidatedItem._bathroomQuantity = unitData.bathroomQuantity
-      consolidatedItem._showerADAQuantity = unitData.showerADAQuantity
-      consolidatedItem._showerRegularQuantity = unitData.showerRegularQuantity
-      consolidatedItem._toiletQuantity = unitData.toiletQuantity
-      consolidatedItem._consolidatedNotes = [...new Set(unitData.notes)].join(" ")
-
-      return consolidatedItem
-    })
+      const consolidatedItem = { ...unitData.originalItem };
+      // Store quantities in the item for later use (as numbers)
+      (consolidatedItem as any)._kitchenQuantity = unitData.kitchenQuantity;
+      (consolidatedItem as any)._bathroomQuantity = unitData.bathroomQuantity;
+      (consolidatedItem as any)._showerADAQuantity = unitData.showerADAQuantity;
+      (consolidatedItem as any)._showerRegularQuantity = unitData.showerRegularQuantity;
+      (consolidatedItem as any)._toiletQuantity = unitData.toiletQuantity;
+      (consolidatedItem as any)._consolidatedNotes = [...new Set(unitData.notes)].join(" ");
+      return consolidatedItem;
+    });
 
     return consolidatedResult.sort((a, b) => {
       const unitA = unitColumn ? a[unitColumn] : a.Unit
@@ -367,10 +371,10 @@ export default function ReportDetailPage({
   })()
 
   // Check what columns to show
-  const hasKitchenAerators = filteredData.some((item) => item._kitchenQuantity > 0)
-  const hasBathroomAerators = filteredData.some((item) => item._bathroomQuantity > 0)
-  const hasShowers = filteredData.some((item) => item._showerADAQuantity > 0 || item._showerRegularQuantity > 0)
-  const hasToilets = filteredData.some((item) => item._toiletQuantity > 0)
+  const hasKitchenAerators = filteredData.some((item) => Number(item._kitchenQuantity) > 0);
+  const hasBathroomAerators = filteredData.some((item) => Number(item._bathroomQuantity) > 0);
+  const hasShowers = filteredData.some((item) => Number(item._showerADAQuantity) > 0 || Number(item._showerRegularQuantity) > 0);
+  const hasToilets = filteredData.some((item) => Number(item._toiletQuantity) > 0);
   const hasNotes = true
 
   // Load CSV preview data from localStorage and listen for unified notes updates
@@ -601,14 +605,14 @@ export default function ReportDetailPage({
                   if (unitValue !== undefined && editedInstallations[unitValue]?.kitchen !== undefined) {
                     return editedInstallations[unitValue]!.kitchen
                   }
-                  return item._kitchenQuantity > 0 ? "1.0 GPM (1)" : "No Touch."
+                  return Number(item._kitchenQuantity) > 0 ? "1.0 GPM (1)" : "No Touch."
                 })()
 
                 const bathroomAerator = (() => {
                   if (unitValue !== undefined && editedInstallations[unitValue]?.bathroom !== undefined) {
                     return editedInstallations[unitValue]!.bathroom
                   }
-                  if (item._bathroomQuantity > 0) {
+                  if (Number(item._bathroomQuantity) > 0) {
                     return `1.0 GPM (${item._bathroomQuantity})`
                   }
                   return "No Touch."
@@ -620,21 +624,21 @@ export default function ReportDetailPage({
                   }
 
                   const parts = []
-                  if (item._showerRegularQuantity > 0) {
+                  if (Number(item._showerRegularQuantity) > 0) {
                     parts.push(`1.75 GPM (${item._showerRegularQuantity})`)
                   }
-                  if (item._showerADAQuantity > 0) {
+                  if (Number(item._showerADAQuantity) > 0) {
                     parts.push(`1.5 GPM (${item._showerADAQuantity})`)
                   }
 
-                  return parts.length > 0 ? parts.join("; ") : "No Touch."
+                  return parts.length > 0 ? parts.join("\n") : "No Touch."
                 })()
 
                 const toilet = (() => {
                   if (unitValue !== undefined && editedInstallations[unitValue]?.toilet !== undefined) {
                     return editedInstallations[unitValue]!.toilet
                   }
-                  return item._toiletQuantity > 0 ? `0.8 GPF (${item._toiletQuantity})` : ""
+                  return Number(item._toiletQuantity) > 0 ? `0.8 GPF (${item._toiletQuantity})` : ""
                 })()
 
                 return (
@@ -812,7 +816,7 @@ export default function ReportDetailPage({
                           if (unitColumn && editedInstallations[item[unitColumn] ?? ""]?.kitchen !== undefined) {
                             return editedInstallations[item[unitColumn] ?? ""]!.kitchen
                           }
-                          return item._kitchenQuantity > 0 ? "1.0 GPM (1)" : "No Touch."
+                          return Number(item._kitchenQuantity) > 0 ? "1.0 GPM (1)" : "No Touch."
                         })()}
                       </td>
                     )}
@@ -822,7 +826,7 @@ export default function ReportDetailPage({
                           if (unitColumn && editedInstallations[item[unitColumn] ?? ""]?.bathroom !== undefined) {
                             return editedInstallations[item[unitColumn] ?? ""]!.bathroom
                           }
-                          if (item._bathroomQuantity > 0) {
+                          if (Number(item._bathroomQuantity) > 0) {
                             return `1.0 GPM (${item._bathroomQuantity})`
                           }
                           return "No Touch."
@@ -837,14 +841,14 @@ export default function ReportDetailPage({
                           }
 
                           const parts = []
-                          if (item._showerRegularQuantity > 0) {
+                          if (Number(item._showerRegularQuantity) > 0) {
                             parts.push(`1.75 GPM (${item._showerRegularQuantity})`)
                           }
-                          if (item._showerADAQuantity > 0) {
+                          if (Number(item._showerADAQuantity) > 0) {
                             parts.push(`1.5 GPM (${item._showerADAQuantity})`)
                           }
 
-                          return parts.length > 0 ? parts.join("; ") : "No Touch."
+                          return parts.length > 0 ? parts.join("\n") : "No Touch."
                         })()}
                       </td>
                     )}
@@ -854,7 +858,7 @@ export default function ReportDetailPage({
                           if (unitColumn && editedInstallations[item[unitColumn] ?? ""]?.toilet !== undefined) {
                             return editedInstallations[item[unitColumn] ?? ""]!.toilet
                           }
-                          return item._toiletQuantity > 0 ? `0.8 GPF (${item._toiletQuantity})` : ""
+                          return Number(item._toiletQuantity) > 0 ? `0.8 GPF (${item._toiletQuantity})` : ""
                         })()}
                       </td>
                     )}

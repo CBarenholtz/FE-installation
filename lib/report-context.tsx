@@ -102,56 +102,106 @@ export function ReportProvider({ children }: { children: ReactNode }) {
     const storedCoverImageSize = localStorage.getItem("coverImageSize")
 
     if (storedCustomerInfo) {
-      setCustomerInfo(JSON.parse(storedCustomerInfo))
+      try {
+        setCustomerInfo(JSON.parse(storedCustomerInfo))
+      } catch (e) {
+        console.error('Failed to parse storedCustomerInfo:', e)
+      }
     }
 
     if (storedToiletCount) {
-      setToiletCount(JSON.parse(storedToiletCount))
+      try {
+        setToiletCount(JSON.parse(storedToiletCount))
+      } catch (e) {
+        console.error('Failed to parse storedToiletCount:', e)
+      }
     }
 
     if (storedNotes) {
-      setNotes(JSON.parse(storedNotes))
+      try {
+        setNotes(JSON.parse(storedNotes))
+      } catch (e) {
+        console.error('Failed to parse storedNotes:', e)
+      }
     }
 
     if (storedLetterText) {
-      setLetterText(JSON.parse(storedLetterText))
+      try {
+        setLetterText(JSON.parse(storedLetterText))
+      } catch (e) {
+        console.error('Failed to parse storedLetterText:', e)
+      }
     } else {
       // Initialize with default text that includes the toilet count
       setLetterText(defaultLetterText)
     }
 
     if (storedReportTitle) {
-      setReportTitle(JSON.parse(storedReportTitle))
+      try {
+        setReportTitle(JSON.parse(storedReportTitle))
+      } catch (e) {
+        console.error('Failed to parse storedReportTitle:', e)
+      }
     }
 
     if (storedSignatureName) {
-      setSignatureName(JSON.parse(storedSignatureName))
+      try {
+        setSignatureName(JSON.parse(storedSignatureName))
+      } catch (e) {
+        console.error('Failed to parse storedSignatureName:', e)
+      }
     }
 
     if (storedSignatureTitle) {
-      setSignatureTitle(JSON.parse(storedSignatureTitle))
+      try {
+        setSignatureTitle(JSON.parse(storedSignatureTitle))
+      } catch (e) {
+        console.error('Failed to parse storedSignatureTitle:', e)
+      }
     }
 
     // Load new editable text elements
     if (storedRePrefix) {
-      setRePrefix(JSON.parse(storedRePrefix))
+      try {
+        setRePrefix(JSON.parse(storedRePrefix))
+      } catch (e) {
+        console.error('Failed to parse storedRePrefix:', e)
+      }
     }
 
     if (storedDearPrefix) {
-      setDearPrefix(JSON.parse(storedDearPrefix))
+      try {
+        setDearPrefix(JSON.parse(storedDearPrefix))
+      } catch (e) {
+        console.error('Failed to parse storedDearPrefix:', e)
+      }
     }
 
     if (storedSectionTitles) {
-      setSectionTitles(JSON.parse(storedSectionTitles))
+      try {
+        setSectionTitles(JSON.parse(storedSectionTitles))
+      } catch (e) {
+        console.error('Failed to parse storedSectionTitles:', e)
+      }
     }
 
     // Load cover image
     if (storedCoverImage) {
-      setCoverImage(JSON.parse(storedCoverImage))
+      try {
+        setCoverImage(JSON.parse(storedCoverImage))
+      } catch (e) {
+        // If not valid JSON, assume it's a data URL string
+        setCoverImage(storedCoverImage)
+        console.warn('Stored cover image is not JSON, using as string.')
+      }
     }
 
     if (storedCoverImageSize) {
-      setCoverImageSize(JSON.parse(storedCoverImageSize))
+      try {
+        setCoverImageSize(JSON.parse(storedCoverImageSize))
+      } catch (e) {
+        console.error('Failed to parse storedCoverImageSize:', e)
+      }
     }
   }, [])
 

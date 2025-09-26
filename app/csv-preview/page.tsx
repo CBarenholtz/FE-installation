@@ -169,7 +169,7 @@ export default function CsvPreviewPage() {
 
     setSelectedCells((prev) => {
       const unitCells = prev[unitValue] || []
-      const cellIdentifier = `${getProperCase(column)}: ${value}`
+      const cellIdentifier = `${value}`
 
       const isSelected = unitCells.includes(cellIdentifier)
 
@@ -194,7 +194,7 @@ export default function CsvPreviewPage() {
     if (!unitValue) return false
 
     const unitCells = selectedCells[unitValue] || []
-    const cellIdentifier = `${getProperCase(column)}: ${value}`
+    const cellIdentifier = `${value}`
     return unitCells.includes(cellIdentifier)
   }
 
