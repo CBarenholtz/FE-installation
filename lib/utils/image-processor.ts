@@ -1,5 +1,5 @@
 import type { ImageData, ProcessedImage, InstallationData, Note } from "@/lib/types"
-import { getUnifiedNotes } from "@/lib/notes"
+import { getNotesAndDetails } from "@/lib/notes"
 
 // Enhanced keyword matching for different types of issues
 const ISSUE_KEYWORDS = {
@@ -486,88 +486,26 @@ export function setCaptionsFromUnitNotes(
       }
     }
 
-    // Get comprehensive notes for this unit using the unified notes system
-    let comprehensiveNotes = ""
-
-    // 1. Add leak issue notes (existing functionality)
-    if (tubLeakColumn && unitData[tubLeakColumn] && unitData[tubLeakColumn].trim()) {
-      const severity = unitData[tubLeakColumn].trim()
-      comprehensiveNotes += `${severity} leak from tub spout. `
-    }
-    if (kitchSinkColumn && unitData[kitchSinkColumn] && unitData[kitchSinkColumn].trim()) {
-      const severity = unitData[kitchSinkColumn].trim()
-      comprehensiveNotes += `${severity} drip from kitchen faucet. `
-    }
-    if (bathSinkColumn && unitData[bathSinkColumn] && unitData[bathSinkColumn].trim()) {
-      const severity = unitData[bathSinkColumn].trim()
-      comprehensiveNotes += `${severity} drip from bathroom faucet. `
-    }
-
-    // 2. Add CSV preview selected columns notes
-    if (selectedNotesColumns.length > 0) {
-      selectedNotesColumns.forEach((columnName) => {
-        if (unitData[columnName] && unitData[columnName].trim()) {
-          comprehensiveNotes += `${columnName}: ${unitData[columnName].trim()}. `
-        }
-      })
-    }
-
-    // 3. Add CSV preview selected cells notes
-    if (selectedCells[image.unit]) {
-      selectedCells[image.unit].forEach((cellNote) => {
-        comprehensiveNotes += `${cellNote}. `
-      })
-    }
-
-    // 4. Add any additional notes from the unit data
-    if (unitData.Notes && unitData.Notes.trim()) {
-      comprehensiveNotes += unitData.Notes.trim() + " "
-    }
-
-    // 5. Add notes from the notes array (if any)
-    const unitNote = notes.find((note) => note.unit === image.unit)
-    if (unitNote && unitNote.note && unitNote.note.trim()) {
-      comprehensiveNotes += unitNote.note.trim() + " "
-    }
-
-    // 6. Use the unified notes system to get the most comprehensive notes
+    // Use the notes page (reportNotes in localStorage) for image descriptions
+    let caption = ""
     try {
-      const unifiedNotes = getUnifiedNotes({
-        installationData,
-        unitColumn: unitColumn || "Unit",
-        selectedCells,
-        selectedNotesColumns,
-      })
-
-      const unitUnifiedNote = unifiedNotes.find(note => note.unit === image.unit)
-      if (unitUnifiedNote && unitUnifiedNote.note && unitUnifiedNote.note.trim()) {
-        // If unified notes has more comprehensive information, use it
-        if (unitUnifiedNote.note.length > comprehensiveNotes.length) {
-          comprehensiveNotes = unitUnifiedNote.note.trim()
-          console.log(`🔥 Using unified notes for caption: "${comprehensiveNotes}"`)
+      const reportNotesRaw = localStorage.getItem("reportNotes")
+      if (reportNotesRaw) {
+        const reportNotes = JSON.parse(reportNotesRaw)
+        const noteEntry = reportNotes.find((n: any) => n.unit === image.unit)
+        if (noteEntry && noteEntry.note && noteEntry.note.trim()) {
+          caption = noteEntry.note.trim()
+          console.log(`🔥 Using notes page for caption: "${caption}"`)
         }
       }
     } catch (error) {
-      console.error("🔥 Error getting unified notes:", error)
+      console.error("🔥 Error getting notes from reportNotes:", error)
     }
-
-    // Clean up the comprehensive notes
-    comprehensiveNotes = comprehensiveNotes.trim()
-
-    let caption = ""
-
-    if (comprehensiveNotes && comprehensiveNotes !== "") {
-      // Use the comprehensive notes as the caption
-      caption = comprehensiveNotes
-      console.log(`🔥 Generated comprehensive caption: "${caption}"`)
-    } else {
-      // Fallback to basic caption
+    if (!caption) {
       caption = image.caption || `Unit ${image.unit} installation photo`
       console.log(`🔥 Using fallback caption: "${caption}"`)
     }
-
     console.log(`🔥 Final caption for ${image.filename}: "${caption}"`)
-
     return {
       ...image,
       caption: caption,

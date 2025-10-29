@@ -577,9 +577,14 @@ function ReportView({
           <ReportLetterPage customerInfo={customerInfo} toiletCount={toiletCount} isEditable={false} />
         </div>
         <div className="page-break"></div>
-        <ReportNotesPage notes={notes} isPreview={false} isEditable={false} />
+        <ReportNotesPage notes={notes} isPreview={false} isEditable={false}  />
         <div className="page-break"></div>
-        <ReportDetailPage installationData={installationData} isPreview={false} isEditable={false} />
+      <ReportDetailPage 
+        installationData={installationData} 
+        isPreview={true} 
+        isEditable={true}
+        unitTypeProp={customerInfo.unitType}  // ADD THIS
+      />
         <div className="page-break"></div>
         <ReportPicturesPage isPreview={false} isEditable={false} />
       </div>
@@ -607,8 +612,8 @@ function ReportView({
           </TabsContent>
 
           <TabsContent value="details">
-            <ReportDetailPage installationData={installationData} isPreview={true} isEditable={true} />
-          </TabsContent>
+  <ReportDetailPage installationData={installationData} isPreview={true} isEditable={true} unitTypeProp={customerInfo.unitType} />
+</TabsContent>
 
           <TabsContent value="pictures">
             <div className="space-y-6">

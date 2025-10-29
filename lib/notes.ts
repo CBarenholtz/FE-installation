@@ -61,14 +61,15 @@ export function compileAllNotes({
 }
 
 // Unified notes management functions
+
+// --- Notes Storage ---
 export function getStoredNotes(): Record<string, string> {
   if (typeof window === "undefined") return {}
-
   try {
-    const stored = localStorage.getItem("unifiedNotes")
+    const stored = localStorage.getItem("unitNotes")
     return stored ? JSON.parse(stored) : {}
   } catch (error) {
-    console.error("Error parsing stored unified notes:", error)
+    console.error("Error parsing stored notes:", error)
     return {}
   }
 }
@@ -76,11 +77,10 @@ export function getStoredNotes(): Record<string, string> {
 export function saveStoredNotes(notes: Record<string, string>): void {
   if (typeof window === "undefined") return
   try {
-    localStorage.setItem("unifiedNotes", JSON.stringify(notes))
-    // Dispatch a custom event to notify listeners that notes have changed
-    window.dispatchEvent(new Event("unifiedNotesUpdated"))
+    localStorage.setItem("unitNotes", JSON.stringify(notes))
+    window.dispatchEvent(new Event("unitNotesUpdated"))
   } catch (error) {
-    console.error("Error saving unified notes:", error)
+    console.error("Error saving notes:", error)
   }
 }
 
@@ -90,7 +90,37 @@ export function updateStoredNote(unit: string, note: string): void {
   saveStoredNotes(updatedNotes)
 }
 
-export function getUnifiedNotes({
+// --- Details Storage ---
+export function getStoredDetails(): Record<string, string> {
+  if (typeof window === "undefined") return {}
+  try {
+    const stored = localStorage.getItem("unitDetails")
+    return stored ? JSON.parse(stored) : {}
+  } catch (error) {
+    console.error("Error parsing stored details:", error)
+    return {}
+  }
+}
+
+export function saveStoredDetails(details: Record<string, string>): void {
+  if (typeof window === "undefined") return
+  try {
+    localStorage.setItem("unitDetails", JSON.stringify(details))
+    window.dispatchEvent(new Event("unitDetailsUpdated"))
+  } catch (error) {
+    console.error("Error saving details:", error)
+  }
+}
+
+export function updateStoredDetail(unit: string, detail: string): void {
+  const existingDetails = getStoredDetails()
+  const updatedDetails = { ...existingDetails, [unit]: detail }
+  saveStoredDetails(updatedDetails)
+}
+
+
+// Returns both notes and details for each unit, starting off the same but independently editable
+export function getNotesAndDetails({
   installationData,
   unitColumn,
   selectedCells = {},
@@ -100,7 +130,7 @@ export function getUnifiedNotes({
   unitColumn: string
   selectedCells?: Record<string, string[]>
   selectedNotesColumns?: string[]
-}): Array<{ unit: string; note: string; [key: string]: any }> {
+}): Array<{ unit: string; note: string; detail: string; [key: string]: any }> {
   // Get compiled notes from installation data
   const compiledNotes = compileAllNotes({
     installationData,
@@ -109,17 +139,25 @@ export function getUnifiedNotes({
     selectedNotesColumns,
   })
 
-  // Get manually edited notes from localStorage
+  // Get manually edited notes and details from localStorage
   const storedNotes = getStoredNotes()
+  const storedDetails = getStoredDetails()
 
-  // Merge compiled notes with manual edits
+  // Merge compiled notes with manual edits for both notes and details
   return compiledNotes.map((item) => ({
     ...item,
     note: storedNotes[item.unit] !== undefined ? storedNotes[item.unit] : item.note,
+    detail: storedDetails[item.unit] !== undefined ? storedDetails[item.unit] : item.note,
   }))
 }
+
 
 export function getFinalNoteForUnit(unit: string, compiledNote: string): string {
   const storedNotes = getStoredNotes()
   return storedNotes[unit] !== undefined ? storedNotes[unit] : compiledNote
+}
+
+export function getFinalDetailForUnit(unit: string, compiledNote: string): string {
+  const storedDetails = getStoredDetails()
+  return storedDetails[unit] !== undefined ? storedDetails[unit] : compiledNote
 }

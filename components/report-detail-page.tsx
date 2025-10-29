@@ -5,46 +5,43 @@ import { getAeratorDescription, formatNote } from "@/lib/utils/aerator-helpers"
 import { useReportContext } from "@/lib/report-context"
 import { Button } from "@/components/ui/button"
 import { Plus, Trash2 } from "lucide-react"
-import { updateStoredNote, getStoredNotes, getUnifiedNotes } from "@/lib/notes"
+import { updateStoredNote, getStoredNotes, getNotesAndDetails, updateStoredDetail, getStoredDetails } from "@/lib/notes"
 
-interface InstallationData {
-  Unit: string
-  "Shower Head"?: string
-  "Bathroom aerator"?: string
-  "Kitchen Aerator"?: string
-  "Leak Issue Kitchen Faucet"?: string
-  "Leak Issue Bath Faucet"?: string
-  "Tub Spout/Diverter Leak Issue"?: string
-  Notes?: string
-  [key: string]: string | undefined
-}
+import type { InstallationData } from "@/lib/types"
+
+
 
 interface ReportDetailPageProps {
   installationData: InstallationData[]
   isPreview?: boolean
   isEditable?: boolean
+  unitTypeProp?: string
 }
 
 export default function ReportDetailPage({
   installationData,
   isPreview = true,
   isEditable = true,
+  unitTypeProp,
 }: ReportDetailPageProps) {
   const { sectionTitles, setSectionTitles } = useReportContext()
 
   // State to store edited notes
+  const [unitType, setUnitType] = useState<"Unit" | "Room">((unitTypeProp as "Unit" | "Room") || "Unit")  // ← Initialize with prop value
   const [editedNotes, setEditedNotes] = useState<Record<string, string>>({})
+  const [editedDetails, setEditedDetails] = useState<Record<string, string>>({})
   const [editedInstallations, setEditedInstallations] = useState<Record<string, Record<string, string>>>({})
   const [editedUnits, setEditedUnits] = useState<Record<string, string>>({})
   const [additionalRows, setAdditionalRows] = useState<InstallationData[]>([])
   const [columnHeaders, setColumnHeaders] = useState({
-    unit: "Unit",
-    kitchen: "Kitchen Installed",
-    bathroom: "Bathroom Installed",
-    shower: "Shower Installed",
+    unit: unitType,
+    kitchen: "Kitchen Aerator Installed",
+    bathroom: "Bathroom Aerator Installed",
+    shower: "Shower Head Installed",
     toilet: "Toilet Installed",
     notes: "Notes",
   })
+
 
   const findUnitColumn = (data: InstallationData[]): string | null => {
     if (!data || data.length === 0) return null
@@ -117,7 +114,7 @@ export default function ReportDetailPage({
       }
     }
 
-    return "No Touch."
+    return "Unable"
   }
 
   const kitchenAeratorColumn = findColumnName(["Kitchen Aerator", "kitchen aerator", "kitchen", "kitchen aerators"])
@@ -143,38 +140,26 @@ export default function ReportDetailPage({
     return getToiletColumnInfo(item).installed
   }
 
-  // Use the same unified notes system as the Notes page
-  const getNotesForUnit = (unitValue: string): string => {
+  // Use the new notes/details system
+  const getNotesAndDetailsForUnit = (unitValue: string): { note: string; detail: string } => {
     try {
-      // Load selected cells and columns from localStorage (from CSV preview)
       let selectedCells: Record<string, string[]> = {}
       let selectedNotesColumns: string[] = []
-
       const storedSelectedCells = localStorage.getItem("selectedCells")
       const storedSelectedNotesColumns = localStorage.getItem("selectedNotesColumns")
-
-      if (storedSelectedCells) {
-        selectedCells = JSON.parse(storedSelectedCells)
-      }
-
-      if (storedSelectedNotesColumns) {
-        selectedNotesColumns = JSON.parse(storedSelectedNotesColumns)
-      }
-
-      // Use unified notes system to get notes for this unit
-      const unifiedNotes = getUnifiedNotes({
+      if (storedSelectedCells) selectedCells = JSON.parse(storedSelectedCells)
+      if (storedSelectedNotesColumns) selectedNotesColumns = JSON.parse(storedSelectedNotesColumns)
+      const notesAndDetails = getNotesAndDetails({
         installationData,
         unitColumn: unitColumn || "Unit",
         selectedCells,
         selectedNotesColumns,
       })
-
-      // Find the note for this specific unit
-      const unitNote = unifiedNotes.find(note => note.unit === unitValue)
-      return unitNote ? unitNote.note : ""
+      const found = notesAndDetails.find(nd => nd.unit === unitValue)
+      return found ? { note: found.note, detail: found.detail } : { note: "", detail: "" }
     } catch (error) {
-      console.error("Error getting unified notes for unit:", unitValue, error)
-      return ""
+      console.error("Error getting notes/details for unit:", unitValue, error)
+      return { note: "", detail: "" }
     }
   }
 
@@ -182,7 +167,7 @@ export default function ReportDetailPage({
   const allData = [...installationData, ...additionalRows]
 
   const filteredData = (() => {
-    const result = []
+  const result: InstallationData[] = []
 
     for (let i = 0; i < allData.length; i++) {
       const item = allData[i]
@@ -334,10 +319,10 @@ export default function ReportDetailPage({
         consolidatedData[unitKey].toiletQuantity = 0;
       }
 
-      // Get notes using the unified notes system (same as Notes page)
-      const unitNotes = getNotesForUnit(unitKey)
-      if (unitNotes && unitNotes.trim()) {
-        consolidatedData[unitKey].notes.push(unitNotes.trim())
+      // Get notes using the new notes/details system
+      const { note: unitNote } = getNotesAndDetailsForUnit(unitKey)
+      if (unitNote && unitNote.trim()) {
+        consolidatedData[unitKey].notes.push(unitNote.trim())
       }
     }
 
@@ -377,6 +362,16 @@ export default function ReportDetailPage({
   const hasToilets = filteredData.some((item) => Number(item._toiletQuantity) > 0);
   const hasNotes = true
 
+useEffect(() => {
+  // Update unit type when prop changes
+  const newUnitType = (unitTypeProp as "Unit" | "Room") || "Unit"
+  setUnitType(newUnitType)
+  // Update column header when unit type changes
+  setColumnHeaders(prev => ({
+    ...prev,
+    unit: newUnitType as "Unit" | "Room"
+  }))
+}, [unitTypeProp])
   // Load CSV preview data from localStorage and listen for unified notes updates
   useEffect(() => {
     try {
@@ -398,23 +393,37 @@ export default function ReportDetailPage({
     }
   }, [])
 
-  // Listen for unified notes updates (same as Notes page)
+  // Listen for notes/details updates
   useEffect(() => {
     const handleNotesUpdate = () => {
-      console.log("Details: Received unified notes update event")
-      // Force re-render when unified notes are updated
-      setEditedNotes({ ...editedNotes })
+      setEditedNotes({ ...getStoredNotes() })
     }
-
+    const handleDetailsUpdate = () => {
+      setEditedDetails({ ...getStoredDetails() })
+    }
     window.addEventListener("unifiedNotesUpdated", handleNotesUpdate)
-    return () => window.removeEventListener("unifiedNotesUpdated", handleNotesUpdate)
-  }, [editedNotes])
+    window.addEventListener("unitDetailsUpdated", handleDetailsUpdate)
+    return () => {
+      window.removeEventListener("unifiedNotesUpdated", handleNotesUpdate)
+      window.removeEventListener("unitDetailsUpdated", handleDetailsUpdate)
+    }
+  }, [])
 
   // Event handlers
   const handleNoteEdit = (unit: string, value: string) => {
     if (isEditable) {
       updateStoredNote(unit, value)
       setEditedNotes((prev) => ({
+        ...prev,
+        [unit]: value,
+      }))
+    }
+  }
+
+  const handleDetailEdit = (unit: string, value: string) => {
+    if (isEditable) {
+      updateStoredDetail(unit, value)
+      setEditedDetails((prev) => ({
         ...prev,
         [unit]: value,
       }))
@@ -478,10 +487,10 @@ export default function ReportDetailPage({
     setAdditionalRows((prev) => prev.filter((row) => row.Unit !== unitToRemove))
   }
 
-  // Load stored notes on component mount
+  // Load stored notes/details on component mount
   useEffect(() => {
-    const storedNotes = getStoredNotes()
-    setEditedNotes(storedNotes)
+    setEditedNotes(getStoredNotes())
+    setEditedDetails(getStoredDetails())
   }, [])
 
   if (!installationData || installationData.length === 0) {
@@ -582,12 +591,12 @@ export default function ReportDetailPage({
                   <th className="text-left py-2 px-2 border-b">
                     {isEditable ? (
                       <EditableText
-                        value={columnHeaders.notes}
-                        onChange={(value) => handleColumnHeaderChange("notes", value)}
-                        placeholder="Notes"
+                        value={"Details"}
+                        onChange={() => {}}
+                        placeholder="Details"
                       />
                     ) : (
-                      columnHeaders.notes
+                      "Details"
                     )}
                   </th>
                 )}
@@ -605,7 +614,7 @@ export default function ReportDetailPage({
                   if (unitValue !== undefined && editedInstallations[unitValue]?.kitchen !== undefined) {
                     return editedInstallations[unitValue]!.kitchen
                   }
-                  return Number(item._kitchenQuantity) > 0 ? "1.0 GPM (1)" : "No Touch."
+                  return Number(item._kitchenQuantity) > 0 ? "1.0 GPM" : "Unable"
                 })()
 
                 const bathroomAerator = (() => {
@@ -613,9 +622,11 @@ export default function ReportDetailPage({
                     return editedInstallations[unitValue]!.bathroom
                   }
                   if (Number(item._bathroomQuantity) > 0) {
-                    return `1.0 GPM (${item._bathroomQuantity})`
+                    return Number(item._bathroomQuantity) === 1
+                      ? "1.0 GPM"
+                      : `1.0 GPM (${item._bathroomQuantity})`
                   }
-                  return "No Touch."
+                  return "Unable"
                 })()
 
                 const shower = (() => {
@@ -623,22 +634,35 @@ export default function ReportDetailPage({
                     return editedInstallations[unitValue]!.shower
                   }
 
-                  const parts = []
-                  if (Number(item._showerRegularQuantity) > 0) {
-                    parts.push(`1.75 GPM (${item._showerRegularQuantity})`)
-                  }
-                  if (Number(item._showerADAQuantity) > 0) {
-                    parts.push(`1.5 GPM (${item._showerADAQuantity})`)
-                  }
+                    const parts = []
+                    if (Number(item._showerRegularQuantity) > 0) {
+                    if (Number(item._showerRegularQuantity) === 1 && Number(item._showerADAQuantity) === 0) {
+                      parts.push("1.75 GPM")
+                    } else {
+                      parts.push(`1.75 GPM (${item._showerRegularQuantity})`)
+                    }
+                    }
+                    if (Number(item._showerADAQuantity) > 0) {
+                    if (Number(item._showerADAQuantity) === 1 && Number(item._showerRegularQuantity) === 0) {
+                      parts.push("1.5 GPM")
+                    } else {
+                      parts.push(`1.5 GPM (${item._showerADAQuantity})`)
+                    }
+                    }
 
-                  return parts.length > 0 ? parts.join("\n") : "No Touch."
+                  return parts.length > 0 ? parts.join("\n") : "Unable"
                 })()
 
                 const toilet = (() => {
                   if (unitValue !== undefined && editedInstallations[unitValue]?.toilet !== undefined) {
                     return editedInstallations[unitValue]!.toilet
                   }
-                  return Number(item._toiletQuantity) > 0 ? `0.8 GPF (${item._toiletQuantity})` : ""
+                    if (Number(item._toiletQuantity) > 0) {
+                    return Number(item._toiletQuantity) === 1
+                      ? "0.8 GPF"
+                      : `0.8 GPF (${item._toiletQuantity})`
+                    }
+                    return ""
                 })()
 
                 return (
@@ -741,20 +765,20 @@ export default function ReportDetailPage({
                         {isEditable ? (
                           <EditableText
                             value={
-                              editedNotes[unitValue ?? ""] !== undefined
-                                ? editedNotes[unitValue ?? ""]
-                                : getNotesForUnit(unitValue ?? "")
+                              editedDetails[unitValue ?? ""] !== undefined
+                                ? editedDetails[unitValue ?? ""]
+                                : getNotesAndDetailsForUnit(unitValue ?? "").detail
                             }
-                            onChange={(value) => handleNoteEdit(unitValue ?? "", value)}
-                            placeholder="Notes"
+                            onChange={(value) => handleDetailEdit(unitValue ?? "", value)}
+                            placeholder="Details"
                           />
-                        ) : editedNotes[unitValue ?? ""] !== undefined ? (
-                          editedNotes[unitValue ?? ""]
+                        ) : editedDetails[unitValue ?? ""] !== undefined ? (
+                          editedDetails[unitValue ?? ""]
                         ) : (
                           <div>
-                            {getNotesForUnit(unitValue ?? "")}
-                            <div className="text-xs text-green-600 mt-1">
-                              📊 Unified notes system (same as Notes page)
+                            {getNotesAndDetailsForUnit(unitValue ?? "").detail}
+                            <div className="text-xs text-blue-600 mt-1">
+                              📄 Details
                             </div>
                           </div>
                         )}
@@ -804,7 +828,7 @@ export default function ReportDetailPage({
                     {hasBathroomAerators && <th className="text-left py-2 px-2 border-b">{columnHeaders.bathroom}</th>}
                     {hasShowers && <th className="text-left py-2 px-2 border-b">{columnHeaders.shower}</th>}
                     {hasToilets && <th className="text-left py-2 px-2 border-b">{columnHeaders.toilet}</th>}
-                    {hasNotes && <th className="text-left py-2 px-2 border-b">{columnHeaders.notes}</th>}
+                    {hasNotes && <th className="text-left py-2 px-2 border-b">Details</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -816,7 +840,12 @@ export default function ReportDetailPage({
                           if (unitColumn && editedInstallations[item[unitColumn] ?? ""]?.kitchen !== undefined) {
                             return editedInstallations[item[unitColumn] ?? ""]!.kitchen
                           }
-                          return Number(item._kitchenQuantity) > 0 ? "1.0 GPM (1)" : "No Touch."
+                            if (Number(item._kitchenQuantity) > 0) {
+                            return Number(item._kitchenQuantity) === 1
+                              ? "1.0 GPM"
+                              : `1.0 GPM (${item._kitchenQuantity})`
+                            }
+                            return "Unable"
                         })()}
                       </td>
                     )}
@@ -827,9 +856,11 @@ export default function ReportDetailPage({
                             return editedInstallations[item[unitColumn] ?? ""]!.bathroom
                           }
                           if (Number(item._bathroomQuantity) > 0) {
-                            return `1.0 GPM (${item._bathroomQuantity})`
+                            return Number(item._bathroomQuantity) === 1
+                              ? "1.0 GPM"
+                              : `1.0 GPM (${item._bathroomQuantity})`
                           }
-                          return "No Touch."
+                          return "Unable"
                         })()}
                       </td>
                     )}
@@ -840,15 +871,23 @@ export default function ReportDetailPage({
                             return editedInstallations[item[unitColumn] ?? ""]!.shower
                           }
 
-                          const parts = []
-                          if (Number(item._showerRegularQuantity) > 0) {
-                            parts.push(`1.75 GPM (${item._showerRegularQuantity})`)
-                          }
-                          if (Number(item._showerADAQuantity) > 0) {
-                            parts.push(`1.5 GPM (${item._showerADAQuantity})`)
-                          }
+                            const parts = []
+                            if (Number(item._showerRegularQuantity) > 0) {
+                            if (Number(item._showerRegularQuantity) === 1 && Number(item._showerADAQuantity) === 0) {
+                              parts.push("1.75 GPM")
+                            } else {
+                              parts.push(`1.75 GPM (${item._showerRegularQuantity})`)
+                            }
+                            }
+                            if (Number(item._showerADAQuantity) > 0) {
+                            if (Number(item._showerADAQuantity) === 1 && Number(item._showerRegularQuantity) === 0) {
+                              parts.push("1.5 GPM")
+                            } else {
+                              parts.push(`1.5 GPM (${item._showerADAQuantity})`)
+                            }
+                            }
 
-                          return parts.length > 0 ? parts.join("\n") : "No Touch."
+                          return parts.length > 0 ? parts.join("\n") : "Unable"
                         })()}
                       </td>
                     )}
@@ -858,19 +897,24 @@ export default function ReportDetailPage({
                           if (unitColumn && editedInstallations[item[unitColumn] ?? ""]?.toilet !== undefined) {
                             return editedInstallations[item[unitColumn] ?? ""]!.toilet
                           }
-                          return Number(item._toiletQuantity) > 0 ? `0.8 GPF (${item._toiletQuantity})` : ""
+                            if (Number(item._toiletQuantity) > 0) {
+                            return Number(item._toiletQuantity) === 1
+                              ? "0.8 GPF"
+                              : `0.8 GPF (${item._toiletQuantity})`
+                            }
+                            return ""
                         })()}
                       </td>
                     )}
                     {hasNotes && (
                       <td className="py-2 px-2 border-b">
-                        {editedNotes[item.Unit ?? ""] !== undefined
-                          ? editedNotes[item.Unit ?? ""]
+                        {editedDetails[item.Unit ?? ""] !== undefined
+                          ? editedDetails[item.Unit ?? ""]
                           : (
                             <div>
-                              {getNotesForUnit(item.Unit ?? "")}
-                              <div className="text-xs text-green-600 mt-1">
-                                📊 Unified notes system (same as Notes page)
+                              {getNotesAndDetailsForUnit(item.Unit ?? "").detail}
+                              <div className="text-xs text-blue-600 mt-1">
+                                📄 Details
                               </div>
                             </div>
                           )}

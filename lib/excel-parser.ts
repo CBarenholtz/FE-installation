@@ -273,8 +273,47 @@ export async function parseExcelFile(file: File): Promise<InstallationData[]> {
         })
 
         // Convert the parsed data to the expected format
-        const formattedData = parsedCsvData.map((row: any) => {
+        // First pass: count occurrences of each unit name
+        const unitCounts = new Map<string, number>()
+        parsedCsvData.forEach((row: any) => {
+          const headers = Object.keys(row)
+          const unitColumnName = headers.find(h => h.toLowerCase().includes("unit")) || headers[0]
+          const unitValue = String(row[unitColumnName] || "").trim()
+          if (unitValue) {
+            unitCounts.set(unitValue, (unitCounts.get(unitValue) || 0) + 1)
+          }
+        })
+
+        // Second pass: track current count for numbering
+        const currentCounts = new Map<string, number>()
+        
+        const formattedData = parsedCsvData.map((row: any, index: number) => {
           const formattedRow: Record<string, string> = {}
+
+          // First pass: identify the unit column and its value
+          const headers = Object.keys(row)
+          const unitColumnName = headers.find(h => h.toLowerCase().includes("unit")) || headers[0]
+          let unitValue = String(row[unitColumnName] || "").trim()
+          // Convert unit name to title case (each word capitalized)
+          if (unitValue) {
+            unitValue = unitValue
+              .split(/\s+/)
+              .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+              .join(' ')
+          }
+
+          // Track and number duplicate units only if there are multiple
+          if (unitValue) {
+            const totalCount = unitCounts.get(unitValue) || 0
+            const currentCount = currentCounts.get(unitValue) || 0
+            currentCounts.set(unitValue, currentCount + 1)
+            
+            // Only add numbering if there are multiple units with this name
+            if (totalCount > 1) {
+              unitValue = `${unitValue} ${currentCount + 1}`
+              console.log(`Excel->CSV: Numbering duplicate unit: "${unitValue}"`)
+            }
+          }
 
           Object.keys(row).forEach((key) => {
             // Handle null/undefined values
@@ -283,6 +322,11 @@ export async function parseExcelFile(file: File): Promise<InstallationData[]> {
               value = ""
             } else {
               value = String(value).trim()
+            }
+
+            // If this is the unit column, use the numbered value
+            if (key === unitColumnName) {
+              value = unitValue
             }
 
             // Preserve the original column name

@@ -6,7 +6,7 @@ import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Plus, Trash2 } from "lucide-react"
 import { formatNote } from "@/lib/utils/aerator-helpers"
-import { getUnifiedNotes, updateStoredNote, getStoredNotes } from "@/lib/notes"
+import { getNotesAndDetails, updateStoredNote, getStoredNotes } from "@/lib/notes"
 
 interface Note {
   unit: string
@@ -188,7 +188,7 @@ export default function ReportNotesPage({ notes, isPreview = true, isEditable = 
     return formatNote(noteText + notes.trim())
   }
 
-  // Initialize editedNotes using unified notes system
+  // Initialize editedNotes using notes/details system
   useEffect(() => {
     console.log("Notes: Processing installation data, length:", installationData.length)
 
@@ -226,9 +226,9 @@ export default function ReportNotesPage({ notes, isPreview = true, isEditable = 
       console.error("Notes: Error loading selected data from preview:", error)
     }
 
-    // Use unified notes system to get notes
-    console.log("Notes: Using unified notes system...")
-    const unifiedNotes = getUnifiedNotes({
+    // Use notes/details system to get notes
+    console.log("Notes: Using notes/details system...")
+    const notesAndDetails = getNotesAndDetails({
       installationData,
       unitColumn,
       selectedCells,
@@ -236,7 +236,7 @@ export default function ReportNotesPage({ notes, isPreview = true, isEditable = 
     })
 
     // Filter to only include notes with content (for notes section)
-    const filteredNotes = unifiedNotes.filter((note) => {
+    const filteredNotes = notesAndDetails.filter((note) => {
       const hasContent = note.note && note.note.trim() !== ""
       console.log(`Notes: Filtering note for unit ${note.unit}, has content: ${hasContent}, note: "${note.note}"`)
       return hasContent
@@ -244,7 +244,7 @@ export default function ReportNotesPage({ notes, isPreview = true, isEditable = 
 
     console.log("Notes: Final processed notes:", filteredNotes.length, "notes")
 
-    // Update state with unified notes
+    // Update state with notes
     setEditedNotes(filteredNotes)
     setNotes(filteredNotes)
 
@@ -252,11 +252,11 @@ export default function ReportNotesPage({ notes, isPreview = true, isEditable = 
     localStorage.setItem("reportNotes", JSON.stringify(filteredNotes))
   }, [installationData, setNotes])
 
-  // Listen for unified notes updates
+  // Listen for notes/details updates
   useEffect(() => {
     const handleNotesUpdate = () => {
-      console.log("Notes: Received unified notes update event")
-      // Re-process notes when unified notes are updated
+      console.log("Notes: Received notes/details update event")
+      // Re-process notes when notes/details are updated
       if (installationData.length > 0) {
         const unitColumn = findUnitColumn(installationData)
         if (unitColumn) {
@@ -278,14 +278,14 @@ export default function ReportNotesPage({ notes, isPreview = true, isEditable = 
             console.error("Notes: Error loading selected data:", error)
           }
 
-          const unifiedNotes = getUnifiedNotes({
+          const notesAndDetails = getNotesAndDetails({
             installationData,
             unitColumn,
             selectedCells,
             selectedNotesColumns,
           })
 
-          const filteredNotes = unifiedNotes.filter((note) => {
+          const filteredNotes = notesAndDetails.filter((note) => {
             const hasContent = note.note && note.note.trim() !== ""
             return hasContent
           })
@@ -297,8 +297,8 @@ export default function ReportNotesPage({ notes, isPreview = true, isEditable = 
       }
     }
 
-    window.addEventListener("unifiedNotesUpdated", handleNotesUpdate)
-    return () => window.removeEventListener("unifiedNotesUpdated", handleNotesUpdate)
+    window.addEventListener("unitNotesUpdated", handleNotesUpdate)
+    return () => window.removeEventListener("unitNotesUpdated", handleNotesUpdate)
   }, [installationData, setNotes])
 
   // Filter out notes without valid unit numbers - use editedNotes directly for reactivity

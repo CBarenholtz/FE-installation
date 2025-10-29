@@ -254,9 +254,9 @@ export default function ExcelExportButton({
       // Create detailed installation sheet
       const detailHeaders = [
         latestColumnHeaders.unit || "Unit",
-        latestColumnHeaders.kitchen || "Kitchen Installed",
-        latestColumnHeaders.bathroom || "Bathroom Installed",
-        latestColumnHeaders.shower || "Shower Installed",
+        latestColumnHeaders.kitchen || "Kitchen Aerator Installed",
+        latestColumnHeaders.bathroom || "Bathroom Aerator Installed",
+        latestColumnHeaders.shower || "Shower Head Installed",
         latestColumnHeaders.toilet || "Toilet Installed",
         latestColumnHeaders.notes || "Notes",
       ]
@@ -280,14 +280,14 @@ export default function ExcelExportButton({
             ? editedInstallation.kitchen
             : consolidated.kitchenQuantity > 0
               ? "1.0 GPM (1)"
-              : "No Touch."
+              : "Unable"
 
         const bathroomDisplay =
           editedInstallation?.bathroom !== undefined
             ? editedInstallation.bathroom
             : consolidated.bathroomQuantity > 0
               ? `1.0 GPM (${consolidated.bathroomQuantity})`
-              : "No Touch."
+              : "Unable"
 
         const showerDisplay = (() => {
           if (editedInstallation?.shower !== undefined) {
@@ -302,7 +302,7 @@ export default function ExcelExportButton({
             parts.push(`1.5 GPM (${consolidated.showerADAQuantity})`)
           }
 
-          return parts.length > 0 ? parts.join("\n") : "No Touch."
+          return parts.length > 0 ? parts.join("\n") : "Unable"
         })()
 
         const toiletDisplay =

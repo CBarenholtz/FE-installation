@@ -7,7 +7,7 @@ import type { CustomerInfo, InstallationData, Note } from "@/lib/types"
 import { useReportContext } from "@/lib/report-context"
 // Import the formatNote function
 import { formatNote } from "@/lib/utils/aerator-helpers"
-import { getStoredNotes, getFinalNoteForUnit, getUnifiedNotes } from "@/lib/notes"
+import { getStoredNotes, getFinalDetailForUnit, getStoredDetails } from "@/lib/notes"
 
 interface EnhancedPdfButtonProps {
   customerInfo: CustomerInfo
@@ -30,7 +30,7 @@ export default function EnhancedPdfButton({
   const [footerImage, setFooterImage] = useState<{ dataUrl: string; width: number; height: number } | null>(null)
   const [signatureLoaded, setSignatureLoaded] = useState(false)
   const [signatureImage, setSignatureImage] = useState<string | null>(null)
-  const [editedDetailNotes, setEditedDetailNotes] = useState<Record<string, string>>({})
+  // No longer needed: const [editedDetailNotes, setEditedDetailNotes] = useState<Record<string, string>>({})
   // Add state to track edited installations
   // Add after the editedDetailNotes state declaration
   const [editedInstallations, setEditedInstallations] = useState<Record<string, Record<string, string>>>({})
@@ -62,24 +62,7 @@ export default function EnhancedPdfButton({
     notes: contextNotes, // Add this to get the latest notes from context
   } = useReportContext()
 
-  // Load unified notes from localStorage
-  useEffect(() => {
-    const storedNotes = getStoredNotes()
-    setEditedDetailNotes(storedNotes)
-    console.log("PDF: Loaded unified notes from localStorage:", storedNotes)
-  }, [])
-
-  // Listen for unified notes updates
-  useEffect(() => {
-    const handleNotesUpdate = () => {
-      console.log("PDF: Received unified notes update event")
-      const storedNotes = getStoredNotes()
-      setEditedDetailNotes(storedNotes)
-    }
-
-    window.addEventListener("unifiedNotesUpdated", handleNotesUpdate)
-    return () => window.removeEventListener("unifiedNotesUpdated", handleNotesUpdate)
-  }, [])
+  // No longer need to load or listen for unified notes for details output
 
   // Load edited installations from localStorage
   // Add after the useEffect for loading edited notes
@@ -205,8 +188,8 @@ export default function EnhancedPdfButton({
   // Add this helper function inside the component
   // Helper function to find the toilet column and check if installed
   const getToiletColumnInfo = (item: InstallationData): { installed: boolean; columnName: string | null } => {
-    // Find the toilet column by looking for keys that start with "Toilets Installed:"
-    const toiletColumn = Object.keys(item).find((key) => key.startsWith("Toilets Installed:"))
+    // Find the toilet column by looking for keys that start with "Toilets Installed"
+    const toiletColumn = Object.keys(item).find((key) => key.startsWith("Toilets Installed"))
 
     if (toiletColumn && item[toiletColumn] && item[toiletColumn] !== "") {
       return { installed: true, columnName: toiletColumn }
@@ -215,40 +198,7 @@ export default function EnhancedPdfButton({
     return { installed: false, columnName: null }
   }
 
-  // Use the same unified notes system as the Details page
-  const getNotesForUnit = (unitValue: string, unitColumn: string | null): string => {
-    try {
-      // Load selected cells and columns from localStorage (from CSV preview)
-      let selectedCells: Record<string, string[]> = {}
-      let selectedNotesColumns: string[] = []
-
-      const storedSelectedCells = localStorage.getItem("selectedCells")
-      const storedSelectedNotesColumns = localStorage.getItem("selectedNotesColumns")
-
-      if (storedSelectedCells) {
-        selectedCells = JSON.parse(storedSelectedCells)
-      }
-
-      if (storedSelectedNotesColumns) {
-        selectedNotesColumns = JSON.parse(storedSelectedNotesColumns)
-      }
-
-      // Use unified notes system to get notes for this unit
-      const unifiedNotes = getUnifiedNotes({
-        installationData,
-        unitColumn: unitColumn || "Unit",
-        selectedCells,
-        selectedNotesColumns,
-      })
-
-      // Find the note for this specific unit
-      const unitNote = unifiedNotes.find(note => note.unit === unitValue)
-      return unitNote ? unitNote.note : ""
-    } catch (error) {
-      console.error("Error getting unified notes for unit:", unitValue, error)
-      return ""
-    }
-  }
+  // REMOVED: getNotesForUnit. Use getFinalDetailForUnit for details output.
 
   // Replace the hasToiletInstalled function with this
   const hasToiletInstalled = (item: InstallationData): boolean => {
@@ -460,24 +410,28 @@ export default function EnhancedPdfButton({
 
       const specificColumns = findSpecificColumns()
 
+
+      // Type for specificColumns
+      const typedSpecificColumns = specificColumns as Record<string, string | undefined>;
+
       // Process installation data using same logic as preview
       const filteredInstallationData = installationData.filter((item) => {
-        const unitValue = unitColumn ? item[unitColumn] : item.Unit
-        if (!unitValue || String(unitValue).trim() === "") return false
+        const unitValue = unitColumn ? item[unitColumn] : item.Unit;
+        if (!unitValue || String(unitValue).trim() === "") return false;
 
-        const trimmedUnit = String(unitValue).trim()
-        const lowerUnit = trimmedUnit.toLowerCase()
-        const invalidValues = ["total", "sum", "average", "avg", "count", "header"]
+        const trimmedUnit = String(unitValue).trim();
+        const lowerUnit = trimmedUnit.toLowerCase();
+        const invalidValues = ["total", "sum", "average", "avg", "count", "header"];
 
-        return !invalidValues.some((val) => lowerUnit === val || lowerUnit.includes(val))
-      })
+        return !invalidValues.some((val) => lowerUnit === val || lowerUnit.includes(val));
+      });
 
       // Consolidate by unit using exact same logic as preview
       for (const item of filteredInstallationData) {
-        const unitValue = unitColumn ? item[unitColumn] : item.Unit
-        const unitKey = String(unitValue || "").trim()
+        const unitValue = unitColumn ? item[unitColumn] : item.Unit;
+        const unitKey = String(unitValue || "").trim();
 
-        if (!unitKey) continue
+        if (!unitKey) continue;
 
         if (!consolidatedData[unitKey]) {
           consolidatedData[unitKey] = {
@@ -488,58 +442,63 @@ export default function EnhancedPdfButton({
             showerRegularQuantity: 0,
             toiletQuantity: 0,
             notes: [],
-          }
+          };
         }
 
         // Kitchen: Always 1 if kitchen aerator column has data
-        if (specificColumns.kitchenAerator && item[specificColumns.kitchenAerator]) {
-          const kitchenValue = String(item[specificColumns.kitchenAerator]).trim()
+        const kitchenAeratorCol = typedSpecificColumns.kitchenAerator;
+        if (kitchenAeratorCol && item[kitchenAeratorCol]) {
+          const kitchenValue = String(item[kitchenAeratorCol]).trim();
           if (kitchenValue && kitchenValue !== "" && kitchenValue !== "0") {
-            consolidatedData[unitKey].kitchenQuantity = 1
+            consolidatedData[unitKey].kitchenQuantity = 1;
           }
         }
 
         // Bathroom: Count guest + master columns
-        let bathroomCount = 0
-        if (specificColumns.bathroomAeratorGuest && item[specificColumns.bathroomAeratorGuest]) {
-          const guestValue = String(item[specificColumns.bathroomAeratorGuest]).trim()
+        let bathroomCount = 0;
+        const bathroomGuestCol = typedSpecificColumns.bathroomAeratorGuest;
+        if (bathroomGuestCol && item[bathroomGuestCol]) {
+          const guestValue = String(item[bathroomGuestCol]).trim();
           if (guestValue && guestValue !== "" && guestValue !== "0") {
-            bathroomCount += 1
+            bathroomCount += 1;
           }
         }
-        if (specificColumns.bathroomAeratorMaster && item[specificColumns.bathroomAeratorMaster]) {
-          const masterValue = String(item[specificColumns.bathroomAeratorMaster]).trim()
+        const bathroomMasterCol = typedSpecificColumns.bathroomAeratorMaster;
+        if (bathroomMasterCol && item[bathroomMasterCol]) {
+          const masterValue = String(item[bathroomMasterCol]).trim();
           if (masterValue && masterValue !== "" && masterValue !== "0") {
-            bathroomCount += 1
+            bathroomCount += 1;
           }
         }
-        consolidatedData[unitKey].bathroomQuantity = bathroomCount
+        consolidatedData[unitKey].bathroomQuantity = bathroomCount;
 
         // Shower: Read actual quantities from both columns
         // ADA Shower Head: Only use value from ADA column
-        if (specificColumns.adaShowerHead) {
-          const adaValue = item[specificColumns.adaShowerHead]
-          const adaQuantity = adaValue && adaValue !== '' && adaValue !== '0' ? Number.parseInt(String(adaValue)) || 0 : 0
-          consolidatedData[unitKey].showerADAQuantity = adaQuantity
+        const adaShowerCol = typedSpecificColumns.adaShowerHead;
+        if (adaShowerCol) {
+          const adaValue = item[adaShowerCol];
+          const adaQuantity = adaValue && adaValue !== '' && adaValue !== '0' ? Number.parseInt(String(adaValue)) || 0 : 0;
+          consolidatedData[unitKey].showerADAQuantity = adaQuantity;
         }
         // Regular Shower Head: Only use value from regular column
-        if (specificColumns.regularShowerHead) {
-          const regularValue = item[specificColumns.regularShowerHead]
-          const regularQuantity = regularValue && regularValue !== '' && regularValue !== '0' ? Number.parseInt(String(regularValue)) || 0 : 0
-          consolidatedData[unitKey].showerRegularQuantity = regularQuantity
+        const regularShowerCol = typedSpecificColumns.regularShowerHead;
+        if (regularShowerCol) {
+          const regularValue = item[regularShowerCol];
+          const regularQuantity = regularValue && regularValue !== '' && regularValue !== '0' ? Number.parseInt(String(regularValue)) || 0 : 0;
+          consolidatedData[unitKey].showerRegularQuantity = regularQuantity;
         }
 
         // Toilet: Read direct quantity from toilets installed column
-        if (specificColumns.toiletInstalled && item[specificColumns.toiletInstalled]) {
-          const toiletQuantity = Number.parseInt(String(item[specificColumns.toiletInstalled])) || 0
-          consolidatedData[unitKey].toiletQuantity = toiletQuantity
+        const toiletCol = typedSpecificColumns.toiletInstalled;
+        if (toiletCol && item[toiletCol]) {
+          const toiletQuantity = Number.parseInt(String(item[toiletCol])) || 0;
+          consolidatedData[unitKey].toiletQuantity = toiletQuantity;
         }
 
-        // Get notes using the unified notes system (same as Details page)
-        const unitNotes = getNotesForUnit(unitKey, unitColumn)
-        if (unitNotes && unitNotes.trim()) {
-          consolidatedData[unitKey].notes.push(unitNotes.trim())
-        }
+        // Use details for notes if needed (optional, can remove if not needed)
+        // Use details field for PDF output
+        const compiledNote = ""; // If you have compiled notes, use them here; otherwise, empty string
+        const finalNoteText = getFinalDetailForUnit(unitValue || "", compiledNote);
       }
 
       console.log("Using context values:", {
@@ -596,13 +555,13 @@ export default function EnhancedPdfButton({
         console.error("PDF: Error parsing stored units:", error)
       }
 
-      // Load the latest unified notes from localStorage right before generating the PDF
-      let latestEditedNotes: Record<string, string> = {}
+      // Load the latest details from localStorage right before generating the PDF
+      let latestEditedDetails: Record<string, string> = {}
       try {
-        latestEditedNotes = getStoredNotes()
-        console.log("PDF: Loaded latest unified notes from localStorage:", latestEditedNotes)
+        latestEditedDetails = getStoredDetails()
+        console.log("PDF: Loaded latest details from localStorage:", latestEditedDetails)
       } catch (error) {
-        console.error("PDF: Error loading unified notes:", error)
+        console.error("PDF: Error loading details:", error)
       }
 
       // Load the latest edited installations from localStorage right before generating the PDF
@@ -788,7 +747,7 @@ export default function EnhancedPdfButton({
 
       console.log("Using edited installations:", latestEditedInstallations)
       console.log("Using column headers:", latestColumnHeaders)
-      console.log("Using edited detail notes:", latestEditedNotes)
+  console.log("Using edited details:", latestEditedDetails)
       console.log("Using report notes:", latestReportNotes)
 
       // Create a new jsPDF instance
@@ -1335,7 +1294,7 @@ export default function EnhancedPdfButton({
           // Update the PDF generation to use edited installation values
           // In the section where you write data to PDF, update the kitchen, bathroom, shower, and toilet values
 
-          const consolidated = consolidatedData[originalUnitValue] || {
+          const consolidated = consolidatedData[String(originalUnitValue)] || {
             kitchenQuantity: 0,
             bathroomQuantity: 0,
             showerADAQuantity: 0,
@@ -1350,15 +1309,17 @@ export default function EnhancedPdfButton({
               ? latestEditedInstallations[originalUnitValue].kitchen
               : consolidated.kitchenQuantity > 0
                 ? "1.0 GPM (1)"
-                : "No Touch."
+                : "Unable"
 
           // Bathroom display using consolidated data
-          const bathroomAerator =
+            const bathroomAerator =
             originalUnitValue && latestEditedInstallations[originalUnitValue]?.bathroom !== undefined
               ? latestEditedInstallations[originalUnitValue].bathroom
               : consolidated.bathroomQuantity > 0
-                ? `1.0 GPM (${consolidated.bathroomQuantity})`
-                : "No Touch."
+              ? consolidated.bathroomQuantity === 1
+                ? "1.0 GPM"
+                : `1.0 GPM (${consolidated.bathroomQuantity})`
+              : "Unable"
 
           // Shower display using consolidated data
           const showerHead = (() => {
@@ -1368,26 +1329,38 @@ export default function EnhancedPdfButton({
 
             const parts = []
             if (consolidated.showerRegularQuantity > 0) {
+              if (consolidated.showerRegularQuantity === 1) {
+              parts.push("1.75 GPM")
+              } else {
               parts.push(`1.75 GPM (${consolidated.showerRegularQuantity})`)
+              }
             }
             if (consolidated.showerADAQuantity > 0) {
+              if (consolidated.showerADAQuantity === 1) {
+              parts.push("1.5 GPM")
+              } else {
               parts.push(`1.5 GPM (${consolidated.showerADAQuantity})`)
+              }
             }
 
-            return parts.length > 0 ? parts.join("\n") : "No Touch."
+            return parts.length > 0 ? parts.join("\n") : "Unable"
           })()
 
           // Toilet display using consolidated data
-          const toilet =
+            const toilet =
             originalUnitValue && latestEditedInstallations[originalUnitValue]?.toilet !== undefined
               ? latestEditedInstallations[originalUnitValue].toilet
               : consolidated.toiletQuantity > 0
-                ? `0.8 GPF (${consolidated.toiletQuantity})`
-                : ""
+              ? consolidated.toiletQuantity === 1
+                ? "0.8 GPF"
+                : `0.8 GPF (${consolidated.toiletQuantity})`
+              : ""
 
-          // Use the same unified notes system as the Details page
+          // Use the details field for the Details page (PDF)
           const unitValue = unitColumn ? item[unitColumn] : item.Unit
-          const finalNoteText = getNotesForUnit(unitValue || "", unitColumn)
+          // Use compiled note as fallback if no details exist
+          const compiledNote = "" // If you have compiled notes, use them here; otherwise, empty string
+          const finalNoteText = getFinalDetailForUnit(unitValue || "", compiledNote)
 
           // Calculate how many lines the note will take
           let noteLines: string[] = []
@@ -1434,10 +1407,10 @@ colIndex = 0
 // Wrap unit text if it's too long - FIXED VERSION
 const unitLines = doc.splitTextToSize(displayUnit, columnWidths[colIndex] - 2)
 // Calculate the actual width the text will occupy
-const maxUnitLineWidth = Math.max(...unitLines.map(line => doc.getTextWidth(line)))
+const maxUnitLineWidth = Math.max(...unitLines.map((line: string) => doc.getTextWidth(line)))
 
 // If text is still too wide, force wrap at character level
-const finalUnitLines = []
+const finalUnitLines: string[] = []
 for (const line of unitLines) {
   if (doc.getTextWidth(line) > columnWidths[colIndex] - 2) {
     // Split long words character by character if needed
@@ -1465,7 +1438,7 @@ colIndex++
 const baseYPos = yPos
 
 if (hasKitchenAerators) {
-  const kitchenText = kitchenAerator === "No Touch." ? "—" : kitchenAerator
+  const kitchenText = kitchenAerator === "Unable" ? "—" : kitchenAerator
   // Center the dash, left-align other text
   if (kitchenText === "—") {
     // Simple dash
@@ -1477,7 +1450,7 @@ if (hasKitchenAerators) {
 }
 
 if (hasBathroomAerators) {
-  const bathroomText = bathroomAerator === "No Touch." ? "—" : bathroomAerator
+  const bathroomText = bathroomAerator === "Unable" ? "—" : bathroomAerator
   if (bathroomText === "—") {
     doc.text("\t—\t", columnPositions[colIndex], baseYPos)
   } else {
@@ -1487,7 +1460,7 @@ if (hasBathroomAerators) {
 }
 
 if (hasShowers) {
-  const showerText = showerHead === "No Touch." ? "—" : showerHead
+  const showerText = showerHead === "Unable" ? "—" : showerHead
   if (showerText === "—") {
     doc.text("\t—\t", columnPositions[colIndex], baseYPos)
   } else {
