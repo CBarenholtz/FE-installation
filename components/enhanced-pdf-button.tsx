@@ -39,9 +39,9 @@ export default function EnhancedPdfButton({
   // Add state for column headers
   const [columnHeaders, setColumnHeaders] = useState({
     unit: "Unit",
-    kitchen: "Kitchen\nInstalled",
-    bathroom: "Bathroom\nInstalled",
-    shower: "Shower\nInstalled",
+    kitchen: "Kitchen Aerator\nInstalled",
+    bathroom: "Bathroom Aerator\nInstalled",
+    shower: "Shower Head\nInstalled",
     toilet: "Toilet\nInstalled",
     notes: "Notes",
   })
@@ -1018,6 +1018,12 @@ export default function EnhancedPdfButton({
         let currentPage = 3
         let currentNoteIndex = 0
 
+        // Define column widths for notes section (in mm)
+        const notesUnitColumnWidth = 30 // ~150px converted to mm (150px * 0.353mm/px ≈ 53mm)
+        const notesColumnX = 20 // Unit column starts at 20mm
+        const notesTextColumnX = notesColumnX + notesUnitColumnWidth + 5 // Notes text starts 5mm after unit column
+        const notesTextColumnWidth = 180 - (notesTextColumnX - 15) // Remaining width for notes text
+
         while (currentNoteIndex < filteredNotes.length) {
           doc.addPage()
           addHeaderFooter(currentPage, totalPages)
@@ -1035,8 +1041,8 @@ export default function EnhancedPdfButton({
           doc.rect(15, yPos - 5, 180, 10, "F")
           doc.setFont("helvetica", "bold")
           doc.setFontSize(10) // Set consistent font size for notes
-          doc.text(latestColumnHeaders.unit, 20, yPos) // Use edited column header
-          doc.text(latestColumnHeaders.notes, 50, yPos) // Use edited column header
+          doc.text(latestColumnHeaders.unit, notesColumnX, yPos) // Use edited column header
+          doc.text(latestColumnHeaders.notes, notesTextColumnX, yPos) // Use edited column header
           doc.setFont("helvetica", "normal")
           yPos += 10
 
@@ -1048,38 +1054,52 @@ export default function EnhancedPdfButton({
           while (currentNoteIndex < filteredNotes.length) {
             const note = filteredNotes[currentNoteIndex]
 
-            // Draw alternating row background
-            if (rowCount % 2 === 0) {
-              doc.setFillColor(250, 250, 250)
-              doc.rect(15, yPos - 5, 180, 10, "F")
-            }
-
-            doc.text(note.unit, 20, yPos)
-
-            // Handle long notes with wrapping
-            const noteLines = doc.splitTextToSize(note.note, 140)
+            // Wrap unit text to fit within the fixed width column
+            const unitLines = doc.splitTextToSize(note.unit, notesUnitColumnWidth - 2)
+            
+            // Handle long notes with wrapping - split on newlines first
+            const noteParagraphs = note.note.split('\n')
+            const noteLines: string[] = []
+            
+            // Process each paragraph separately to preserve intentional line breaks
+            noteParagraphs.forEach(paragraph => {
+              const wrappedLines = doc.splitTextToSize(paragraph.trim(), notesTextColumnWidth - 2)
+              noteLines.push(...wrappedLines)
+            })
+            
             doc.setFontSize(10) // Ensure consistent font size
 
-            // Calculate the height this note will take
-            const noteHeight = noteLines.length * 7 // 7mm per line
+            // Calculate the height this note will take (use the larger of unit or note height)
+            const unitHeight = unitLines.length * 7
+            const noteHeight = noteLines.length * 7
+            const rowHeight = Math.max(unitHeight, noteHeight, 10) // Minimum 10mm
 
             // Check if this note will fit on the current page
-            if (yPos + noteHeight > maxYPos && rowCount > 0) {
+            if (yPos + rowHeight > maxYPos && rowCount > 0) {
               // This note won't fit, so we'll start a new page
               break
             }
 
-            // Add the note text
-            noteLines.forEach((line: string, lineIndex: number) => {
-              if (lineIndex === 0) {
-                doc.text(line, 50, yPos)
-              } else {
-                yPos += 7
-                doc.text(line, 50, yPos)
-              }
+            // Store the starting Y position for the row
+            const rowStartY = yPos
+
+            // Draw alternating row background
+            if (rowCount % 2 === 0) {
+              doc.setFillColor(250, 250, 250)
+              doc.rect(15, rowStartY - 5, 180, rowHeight, "F")
+            }
+
+            // Add the unit text with wrapping
+            unitLines.forEach((line: string, lineIndex: number) => {
+              doc.text(line, notesColumnX, rowStartY + lineIndex * 7)
             })
 
-            yPos += 10
+            // Add the note text
+            noteLines.forEach((line: string, lineIndex: number) => {
+              doc.text(line, notesTextColumnX, rowStartY + lineIndex * 7)
+            })
+            
+            yPos = rowStartY + rowHeight + 1
             currentNoteIndex++
             rowCount++
 
@@ -1166,11 +1186,11 @@ export default function EnhancedPdfButton({
 
       // Define minimum widths for each column type
       const minColumnWidths = {
-        kitchen: 25,
-        bathroom: 25,
-        shower: 35, // Increased shower column width from 25 to 35 to accommodate longer text like "1.75 GPM (1); 1.5 GPM (1)"
+        kitchen: 30,
+        bathroom: 30,
+        shower: 30, // Increased shower column width from 25 to 35 to accommodate longer text like "1.75 GPM (1); 1.5 GPM (1)"
         toilet: 20,
-        notes: 60, // Increased width for notes column
+        notes: 55, // Increased width for notes column
       }
 
       // Calculate total minimum width needed
@@ -1308,7 +1328,7 @@ export default function EnhancedPdfButton({
             originalUnitValue && latestEditedInstallations[originalUnitValue]?.kitchen !== undefined
               ? latestEditedInstallations[originalUnitValue].kitchen
               : consolidated.kitchenQuantity > 0
-                ? "1.0 GPM (1)"
+                ? "1.0 GPM"
                 : "Unable"
 
           // Bathroom display using consolidated data
@@ -1342,8 +1362,10 @@ export default function EnhancedPdfButton({
               parts.push(`1.5 GPM (${consolidated.showerADAQuantity})`)
               }
             }
+            // Add a comma if both types exist
+            const showerText = parts.length === 2 ? `${parts[0]},\n${parts[1]}` : parts.join("")
+            return showerText || "Unable"
 
-            return parts.length > 0 ? parts.join("\n") : "Unable"
           })()
 
           // Toilet display using consolidated data

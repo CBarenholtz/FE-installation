@@ -614,7 +614,7 @@ useEffect(() => {
                   if (unitValue !== undefined && editedInstallations[unitValue]?.kitchen !== undefined) {
                     return editedInstallations[unitValue]!.kitchen
                   }
-                  return Number(item._kitchenQuantity) > 0 ? "1.0 GPM" : "Unable"
+                  return Number(item._kitchenQuantity) > 0 ? "1.0 GPM (1)" : "Unable"
                 })()
 
                 const bathroomAerator = (() => {
@@ -631,26 +631,27 @@ useEffect(() => {
 
                 const shower = (() => {
                   if (unitValue !== undefined && editedInstallations[unitValue]?.shower !== undefined) {
-                    return editedInstallations[unitValue]!.shower
+                  return editedInstallations[unitValue]!.shower
                   }
 
-                    const parts = []
-                    if (Number(item._showerRegularQuantity) > 0) {
-                    if (Number(item._showerRegularQuantity) === 1 && Number(item._showerADAQuantity) === 0) {
-                      parts.push("1.75 GPM")
-                    } else {
-                      parts.push(`1.75 GPM (${item._showerRegularQuantity})`)
-                    }
-                    }
-                    if (Number(item._showerADAQuantity) > 0) {
-                    if (Number(item._showerADAQuantity) === 1 && Number(item._showerRegularQuantity) === 0) {
-                      parts.push("1.5 GPM")
-                    } else {
-                      parts.push(`1.5 GPM (${item._showerADAQuantity})`)
-                    }
-                    }
+                  const parts = []
+                  if (Number(item._showerRegularQuantity) > 0) {
+                  if (Number(item._showerRegularQuantity) === 1 && Number(item._showerADAQuantity) === 0) {
+                    parts.push("1.75 GPM")
+                  } else {
+                    parts.push(`1.75 GPM (${item._showerRegularQuantity})`)
+                  }
+                  }
+                  if (Number(item._showerADAQuantity) > 0) {
+                  if (Number(item._showerADAQuantity) === 1 && Number(item._showerRegularQuantity) === 0) {
+                    parts.push("1.5 GPM")
+                  } else {
+                    parts.push(`1.5 GPM (${item._showerADAQuantity})`)
+                  }
+                  }
 
-                  return parts.length > 0 ? parts.join("\n") : "Unable"
+                  // Add a comma if both types exist
+                  return parts.length > 1 ? parts.join(", ") : (parts.length > 0 ? parts[0] : "Unable")
                 })()
 
                 const toilet = (() => {

@@ -567,7 +567,7 @@ export default function ReportNotesPage({ notes, isPreview = true, isEditable = 
         <table className="w-full">
           <thead>
             <tr>
-              <th className="text-left py-2 px-4 border-b">Unit</th>
+              <th className="text-left py-2 px-4 border-b w-[150px]">Unit</th>
               <th className="text-left py-2 px-4 border-b">Notes</th>
               {isEditable && <th className="text-left py-2 px-4 border-b w-16">Actions</th>}
             </tr>
@@ -595,7 +595,7 @@ export default function ReportNotesPage({ notes, isPreview = true, isEditable = 
                         note[unitProp]
                       )}
                     </td>
-                    <td className="py-2 px-4 border-b">
+                    <td className="py-2 px-4 border-b whitespace-pre-line">
                       {isEditable ? (
                         <EditableText
                           value={note.note}
@@ -659,7 +659,7 @@ export default function ReportNotesPage({ notes, isPreview = true, isEditable = 
             <table className="w-full">
               <thead>
                 <tr>
-                  <th className="text-left py-2 px-4 border-b">Unit</th>
+                  <th className="text-left py-2 px-4 border-b w-[20px]">Unit</th>
                   <th className="text-left py-2 px-4 border-b">Notes</th>
                 </tr>
               </thead>
@@ -682,7 +682,7 @@ export default function ReportNotesPage({ notes, isPreview = true, isEditable = 
                           note[unitProp]
                         )}
                       </td>
-                      <td className="py-2 px-4 border-b">
+                      <td className="py-2 px-4 border-b whitespace-pre-line">
                         {isEditable ? (
                           <EditableText
                             value={note.note}
